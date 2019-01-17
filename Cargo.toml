@@ -1,0 +1,7 @@
+[package]
+name = "sortedvec"
+version = "0.1.0"
+authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
+edition = "2018"
+
+[dependencies]
