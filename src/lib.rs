@@ -8,11 +8,11 @@
 //! use sortedvec::SortedVec;
 //!
 //! let unsorted = vec![3, 5, 0, 10, 7, 1];
-//! let sorted = SortedVec::from_vec(unsorted.clone(), |&x| x);
+//! let sorted = SortedVec::from_vec(unsorted.clone(), |x| x);
 //!
 //! // linear search (slow!)
 //! let unsorted_contains_six: Option<_> = unsorted.iter().find(|&x| *x == 6);
-//! assert!(sorted_contains_six.is_none());
+//! assert!(unsorted_contains_six.is_none());
 //!
 //! // binary search (fast!)
 //! let sorted_contains_six: Option<_> = sorted.find(&6);
@@ -44,7 +44,7 @@ use std::ops::Deref;
 ///     key: u32,
 /// }
 ///
-/// let mut sv = SortedVec::new(|a: &A| a.key);
+/// let mut sv = SortedVec::new(|a: &A| &a.key);
 /// sv.insert(A { val: 3.14, key: 0 });
 /// sv.insert(A { val: 0.00, key: 10 });
 /// sv.insert(A { val: 5.00, key: 4 });
