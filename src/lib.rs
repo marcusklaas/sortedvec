@@ -2,29 +2,27 @@
 //! has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
 //! and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
 //! lookup tables where additions and deletions are infrequent.
-//! 
+//!
 //! # Example
 //! ```
 //! use sortedvec::SortedVec;
-//! 
+//!
 //! let unsorted = vec![3, 5, 0, 10, 7, 1];
 //! let sorted = SortedVec::from_vec(unsorted.clone(), |&x| x);
-//! 
+//!
 //! // linear search (slow!)
 //! let unsorted_contains_six: Option<_> = unsorted.iter().find(|&x| *x == 6);
 //! assert!(sorted_contains_six.is_none());
-//! 
+//!
 //! // binary search (fast!)
 //! let sorted_contains_six: Option<_> = sorted.find(&6);
 //! assert!(sorted_contains_six.is_none());
 //! ```
 
-
-use std::hash::{self, Hash};
-use std::ops::Deref;
 use std::borrow::Borrow;
+use std::hash::{self, Hash};
 use std::iter::Extend;
-
+use std::ops::Deref;
 
 /// A `Vec` wrapper type for orderable elements, providing `log(N)` lookups.
 ///
@@ -34,26 +32,26 @@ use std::iter::Extend;
 /// * fast iteration
 /// * semi-fast lookups: `O(log(N))`, compared to a hashmap's `O(1)` and a vector's `O(n)`
 /// * slow insertions and deletions: `O(n)`
-/// 
+///
 /// Its main use case is for small lookup tables where inserts and deletions are infrequent.
-/// 
+///
 /// # Example
 /// ```
 /// use sortedvec::SortedVec;
-/// 
+///
 /// struct A {
 ///     val: f64,
 ///     key: u32,
 /// }
-/// 
+///
 /// let mut sv = SortedVec::new(|a: &A| a.key);
 /// sv.insert(A { val: 3.14, key: 0 });
 /// sv.insert(A { val: 0.00, key: 10 });
 /// sv.insert(A { val: 5.00, key: 4 });
-/// 
+///
 /// assert_eq!(3, sv.len());
 /// assert!(sv.find(&5).is_none());
-/// 
+///
 /// let search_result = sv.find(&4).unwrap();
 /// assert_eq!(5.00, search_result.val);
 /// ```
@@ -64,7 +62,7 @@ pub struct SortedVec<T, F> {
 
 impl<T, F, K> SortedVec<T, F>
 where
-    F: Fn(&T) -> K,
+    F: for<'t> Fn(&'t T) -> &'t K,
     K: Ord + Eq,
 {
     /// Creates a new, empty `SortedVec`. Does not allocate until elements
@@ -93,7 +91,7 @@ where
     }
 
     /// Inserts a new value into the vector, maintaining the internal
-    /// order invariant. Note that this is an `O(n)` operation. 
+    /// order invariant. Note that this is an `O(n)` operation.
     pub fn insert(&mut self, val: T) {
         let ref key = (self.comp)(&val);
         let search = self
@@ -114,7 +112,7 @@ where
 
     /// Tries to find an element in the vector with the given 'key'. It has
     /// logarithmic worst case time complexity. The
-    /// elements' keys are computed using the internal comperator function, 
+    /// elements' keys are computed using the internal comperator function,
     /// which is exposed through the [`SortedVec::comperator`] method.
     pub fn find(&self, key: &K) -> Option<&T> {
         self.inner
@@ -162,7 +160,7 @@ where
         if self.inner.len() == 0 {
             return true;
         }
-        
+
         for i in 0..(self.inner.len() - 1) {
             if (self.comp)(&self.inner[i]) > (self.comp)(&self.inner[i + 1]) {
                 return false;
@@ -199,7 +197,7 @@ impl<T, F> IntoIterator for SortedVec<T, F> {
 
 impl<T, F, K> Extend<T> for SortedVec<T, F>
 where
-    F: Fn(&T) -> K,
+    F: for<'t> Fn(&'t T) -> &'t K,
     K: Ord + Eq,
 {
     fn extend<I>(&mut self, iter: I)
@@ -251,5 +249,4 @@ impl<T, F> AsRef<Vec<T>> for SortedVec<T, F> {
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}
