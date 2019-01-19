@@ -24,7 +24,7 @@ assert!(sorted_contains_six.is_none());
 
 ## Benchmarks
 
-The table below displays how long lookups scale on the standard library's `HashMap`,
+The table below displays how lookups scale on the standard library's `HashMap`,
 `SortedVec` and `Vec` for string and integer keys.
 
 | key type | size | `HashMap` | `SortedVec` | `Vec` |

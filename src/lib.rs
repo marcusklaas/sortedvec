@@ -24,6 +24,24 @@ use std::hash::{self, Hash};
 use std::iter::Extend;
 use std::ops::Deref;
 
+#[macro_export]
+macro_rules! sortedvec {
+    ( $ ( $ x : expr ) , * ) => {
+        {
+            let inner = vec![ $ ( $x, )* ];
+            $crate::from_vec(inner, |x| x)
+        }
+    }
+}
+
+pub fn from_vec<T, F, K>(v: Vec<T>, f: F) -> SortedVec<T, F>
+where
+    F: Clone + for<'t> Fn(&'t T) -> &'t K,
+    K: Ord + Eq + ?Sized,
+{
+    SortedVec::from_vec(v, f)
+}
+
 /// A `Vec` wrapper type for orderable elements, providing `log(N)` lookups.
 ///
 /// `SortedVec` is a `Vec` whose elements are sorted with respect some comperator
@@ -63,7 +81,7 @@ pub struct SortedVec<T, F> {
 impl<T, F, K> SortedVec<T, F>
 where
     F: Clone + for<'t> Fn(&'t T) -> &'t K,
-    K: Ord + Eq,
+    K: Ord + Eq + ?Sized,
 {
     /// Splits the collection into two at the given index.
     ///
@@ -87,7 +105,7 @@ where
 impl<T, F, K> SortedVec<T, F>
 where
     F: for<'t> Fn(&'t T) -> &'t K,
-    K: Ord + Eq,
+    K: Ord + Eq + ?Sized,
 {
     /// Creates a new, empty `SortedVec`. Does not allocate until elements
     /// are inserted.
@@ -100,6 +118,15 @@ where
 
     /// Creates a sorted vector from an existing vector, which does
     /// not need to be sorted beforehand, and a comparison function.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sortedvec::*;
+    ///
+    /// let v = vec!["hello".to_string(), "world".to_string()];
+    /// let sv = SortedVec::from_vec(v, |x| &x[1..]);
+    /// ```
     pub fn from_vec(mut vec: Vec<T>, comp: F) -> Self {
         vec.sort_unstable_by(|ref a, ref b| {
             let lhs = comp(a);
@@ -138,6 +165,16 @@ where
     /// logarithmic worst case time complexity. The
     /// elements' keys are computed using the internal comperator function,
     /// which is exposed through the [`SortedVec::comperator`] method.
+    ///
+    /// #Example
+    ///
+    /// ```
+    /// use sortedvec::*;
+    ///
+    /// let sv = sortedvec![1, 5, 3, 10];
+    /// let res = sv.find(&5).unwrap();
+    /// assert_eq!(&5, res);
+    /// ```
     pub fn find(&self, key: &K) -> Option<&T> {
         self.inner
             .binary_search_by(|probe| (self.comp)(probe).cmp(key))
@@ -261,7 +298,7 @@ impl<T, F> IntoIterator for SortedVec<T, F> {
 impl<T, F, K> Extend<T> for SortedVec<T, F>
 where
     F: for<'t> Fn(&'t T) -> &'t K,
-    K: Ord + Eq,
+    K: Ord + Eq + ?Sized,
 {
     fn extend<I>(&mut self, iter: I)
     where
