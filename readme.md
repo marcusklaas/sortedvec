@@ -7,7 +7,7 @@ lookup tables where additions and deletions are infrequent.
 
 ## Example
 
-```
+```rust
 use sortedvec::SortedVec;
 
 let unsorted = vec![3, 5, 0, 10, 7, 1];
