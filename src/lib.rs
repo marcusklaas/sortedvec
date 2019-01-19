@@ -62,6 +62,30 @@ pub struct SortedVec<T, F> {
 
 impl<T, F, K> SortedVec<T, F>
 where
+    F: Clone + for<'t> Fn(&'t T) -> &'t K,
+    K: Ord + Eq,
+{
+    /// Splits the collection into two at the given index.
+    ///
+    /// Returns a newly allocated `Self`. `self` contains elements `[0, at)`,
+    /// and the returned `Self` contains elements `[at, len)`.
+    ///
+    /// Note that the capacity of `self` does not change.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at > len`.
+    pub fn split_off(&mut self, at: usize) -> Self {
+        let other_inner = self.inner.split_off(at);
+        Self {
+            inner: other_inner,
+            comp: self.comp.clone(),
+        }
+    }
+}
+
+impl<T, F, K> SortedVec<T, F>
+where
     F: for<'t> Fn(&'t T) -> &'t K,
     K: Ord + Eq,
 {
@@ -133,6 +157,45 @@ where
     /// to be sorted with respect to the comperator function.
     pub fn into_inner(self) -> Vec<T> {
         self.inner
+    }
+
+    /// Removes and returns the element at position `index` within the vector,
+    /// shifting all elements after it to the left.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is out of bounds.
+    /// #[unstable(reason = "indices are opaque for this data structure")]
+    pub fn remove(&mut self, index: usize) -> T {
+        self.inner.remove(index)
+    }
+
+    /// Shortens the vector, keeping the first `len` elements and dropping
+    /// the rest.
+    ///
+    /// If `len` is greater than the vector's current length, this has no
+    /// effect.
+    ///
+    /// Note that this method has no effect on the allocated capacity
+    /// of the vector.
+    pub fn truncate(&mut self, len: usize) {
+        self.inner.truncate(len)
+    }
+
+    /// Removes all elements but one that resolve to the same key generated
+    /// by the internal key function.
+    pub fn dedup_by_key(&mut self) {
+        let mut dummy = Vec::new();
+        std::mem::swap(&mut dummy, &mut self.inner);
+
+        dummy.dedup_by(|a, b| (self.comp)(a) == (self.comp)(b));
+
+        std::mem::swap(&mut dummy, &mut self.inner);
+    }
+
+    /// Removes the last element from a vector and returns it, or `None` if it is empty.
+    pub fn pop(&mut self) -> Option<T> {
+        self.inner.pop()
     }
 
     // internal methods
