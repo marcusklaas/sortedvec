@@ -21,3 +21,25 @@ assert!(unsorted_contains_six.is_none());
 let sorted_contains_six: Option<_> = sorted.find(&6);
 assert!(sorted_contains_six.is_none());
 ```
+
+## Benchmarks
+
+The table below displays how long lookups scale on the standard library's `HashMap`,
+`SortedVec` and `Vec` for string and integer keys.
+
+| key type | size | `HashMap` | `SortedVec` | `Vec` |
+|---|---:|---:|---:|---:|
+| int | 2 | 28 | 1 | 1 |
+| int | 6 | 29 | 3 | 2 |
+| int | 10 | 28 | 4 | 3 |
+| int | 50 | 28 | 6 | 13 |
+| int | 100 | 33 | 7 | 25 |
+| int | 500 | 28 | 9 | 130 |
+| int |1000 | 28 | 10 | 245 |
+| string | 2 | 32 | 13 | 5 |
+| string | 6 | 31 | 24 | 13 |
+| string | 10 | 32 | 30 | 23 |
+| string | 50 | 33 | 44 | 123 |
+| string | 100 | 31 | 51 | 231 |
+| string | 500 | 32 | 67 | 1,149 |
+| string |1000 | 32 | 73 | 2,328 |

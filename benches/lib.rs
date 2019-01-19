@@ -40,15 +40,15 @@ macro_rules! gen_bench {
 #[cfg(test)]
 mod string_bench {
     gen_bench!(
-        |x: u32| x.to_string(),
+        |x: u32| format!("{:04}", x),
 
-        one;1u32,
-        five;5u32,
-        ten;10u32,
-        fifty;50u32,
-        hundred;100u32,
-        five_hundred;500u32,
-        thousand;1000u32
+        s0002;2u32,
+        s0006;6u32,
+        s0010;10u32,
+        s0050;50u32,
+        s0100;100u32,
+        s0500;500u32,
+        s1000;1000u32
     );
 }
 
@@ -57,12 +57,12 @@ mod int_bench {
     gen_bench!(
         |x: u32| x,
 
-        one;1u32,
-        five;5u32,
-        ten;10u32,
-        fifty;50u32,
-        hundred;100u32,
-        five_hundred;500u32,
-        thousand;1000u32
+        s0002;2u32,
+        s0006;6u32,
+        s0010;10u32,
+        s0050;50u32,
+        s0100;100u32,
+        s0500;500u32,
+        s1000;1000u32
     );
 }
