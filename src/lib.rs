@@ -24,6 +24,8 @@ use std::hash::{self, Hash};
 use std::iter::Extend;
 use std::ops::Deref;
 
+mod custom;
+
 #[macro_export]
 macro_rules! sortedvec {
     ( $ ( $ x : expr ) , * ) => {
