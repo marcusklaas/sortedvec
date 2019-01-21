@@ -1,9 +1,9 @@
 [package]
 name = "sortedvec"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
 edition = "2018"
-description = " a rust vector that enables quick lookups "
+description = "a sorted vector that enables quick lookups"
 license = "Apache-2.0"
 repository = "https://github.com/marcusklaas/sortedvec"
 keywords = [ "sortedvec", "lookup", "table", "datastructure", "vec" ]
