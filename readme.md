@@ -1,9 +1,11 @@
 # sortedvec
 
-A pure rust library that exposes a single data type, `SortedVec`. Its raison d'être is to
-provide a lookup table that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
+A pure rust library that exposes a single macro, [`def_sorted_vec`]. It generates a lookup
+table on `Ord` keys that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
 and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
-lookup tables where additions and deletions are infrequent.
+lookup tables where insertions and deletions are infrequent.
+
+**Note**: `sortedvec` is still highly experimental and likely to change significantly.
 
 ## Example
 
@@ -29,17 +31,17 @@ The table below displays how lookups scale on the standard library's `HashMap`,
 
 | key type | size | `HashMap` | `SortedVec` | `Vec` |
 |---|---:|---:|---:|---:|
-| int | 2 | 28 | 1 | 1 |
-| int | 6 | 29 | 3 | 2 |
-| int | 10 | 28 | 4 | 3 |
-| int | 50 | 28 | 6 | 13 |
-| int | 100 | 33 | 7 | 25 |
-| int | 500 | 28 | 9 | 130 |
-| int |1000 | 28 | 10 | 245 |
-| string | 2 | 32 | 13 | 5 |
-| string | 6 | 31 | 24 | 13 |
-| string | 10 | 32 | 30 | 23 |
-| string | 50 | 33 | 44 | 123 |
-| string | 100 | 31 | 51 | 231 |
-| string | 500 | 32 | 67 | 1,149 |
-| string |1000 | 32 | 73 | 2,328 |
+| int | 2 | 17 | 2 | 2 |
+| int | 6 | 17 | 3 | 2 |
+| int | 10 | 18 | 4 | 3 |
+| int | 50 | 19 | 5 | 15 |
+| int | 100 | 23 | 6 | 28 |
+| int | 500 | 18 | 8 | 127 |
+| int |1000 | 17 | 8 | 231 |
+| string | 2 | 25 | 10 | 5 |
+| string | 6 | 25 | 20 | 12 |
+| string | 10 | 27 | 25 | 21 |
+| string | 50 | 30 | 36 | 113 |
+| string | 100 | 27 | 42 | 232 |
+| string | 500 | 26 | 53 | 1,207 |
+| string |1000 | 26 | 59 | 2,324 |

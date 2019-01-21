@@ -21,6 +21,7 @@
 //! assert!(sorted_contains_six.is_none());
 //! ```
 
+/// Example of a collection defined using the `def_sorted_vec` macro.
 pub mod example;
 
 /// A macro that defines a sorted vector data collection.
