@@ -27,7 +27,7 @@ macro_rules! gen_bench {
                 #[bench]
                 fn find_sortedvec(b: &mut test::Bencher) {
                     let vec: Vec<_> = (0u32..$x).map($gen).collect();
-                    let sortedvec = sortedvec::SortedVec::from_vec(vec, |x| x);
+                    let sortedvec = super::SortedVec::from(vec);
                     let piv = ($gen)(($x / 2).saturating_sub(1));
 
                     b.iter(|| sortedvec.find(&piv));
@@ -39,6 +39,9 @@ macro_rules! gen_bench {
 
 #[cfg(test)]
 mod string_bench {
+    fn key(x: &String) -> &str { &x[..] }
+    sortedvec::def_sorted_vec! { struct SortedVec: String => str, key }
+
     gen_bench!(
         |x: u32| format!("{:04}", x),
 
@@ -54,6 +57,8 @@ mod string_bench {
 
 #[cfg(test)]
 mod int_bench {
+    sortedvec::def_sorted_vec! { struct SortedVec: u32 => u32, |x| x }
+ 
     gen_bench!(
         |x: u32| x,
 
