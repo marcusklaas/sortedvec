@@ -31,7 +31,7 @@ pub mod example;
 /// - a struct name,
 /// - a value type,
 /// - a key type. Since we will sort on these internally, this type must implement `Ord`,
-/// - a key extraction function of type `FnMut(&T) -> &K`.
+/// - a key extraction function of type `FnMut(&T) -> K`.
 /// 
 /// Matches the following input:
 /// ```text
@@ -43,7 +43,7 @@ pub mod example;
 /// use sortedvec::def_sorted_vec;
 /// 
 /// /// Example key
-/// #[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
+/// #[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Copy)]
 /// pub struct K;
 /// 
 /// /// Example value
@@ -52,8 +52,7 @@ pub mod example;
 ///     key: K,
 /// }
 /// 
-/// fn key(t: &T) -> &K { &t.key }
-/// 
+/// fn key(t: &T) -> K { t.key }
 /// 
 /// def_sorted_vec! {
 ///     /// Sorted vector type that provides quick access to `T`s through `K`s.
@@ -163,6 +162,15 @@ macro_rules! def_sorted_vec {
             }
         }
 
+        impl std::iter::IntoIterator for $name {
+            type Item = $val;
+            type IntoIter = std::vec::IntoIter<$val>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                self.inner.into_iter()
+            }
+        }
+
         impl Into<Vec<$val>> for $name {
             fn into(self) -> Vec<$val> {
                 self.inner
@@ -212,12 +220,46 @@ mod tests {
     fn simple() {
         def_sorted_vec! {
             #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Hash)]
-            pub struct TestVec: u32 => u32, |x| x
+            pub struct TestVec: u32 => u32, |x: &u32| *x
         }
 
         let sv: TestVec = (0u32..10).collect();
         assert!(sv.find(&5) == Some(&5));
         assert_eq!(10, sv.len());
         let v: Vec<_> = sv.clone().into();
+    }
+
+    #[test]
+    fn more_complex() {
+        #[derive(Debug, Default)]
+        struct SomeComplexValue {
+            some_map: std::collections::HashMap<String, std::path::PathBuf>,
+            name: String,
+            prio: u64,
+        }
+
+        fn key_deriv(val: &SomeComplexValue) -> (&str, u64) {
+            (val.name.as_str(), val.prio)
+        }
+
+        def_sorted_vec! {
+            /// Vec of `SomeComplexValues` that allows quick
+            /// lookup by (name, prio) keys
+            #[derive(Debug)]
+            struct ComplexMap: SomeComplexValue => (&str, u64), key_deriv
+        }
+
+        let mut sv = ComplexMap::default();
+        sv.insert(SomeComplexValue {
+            some_map: Default::default(),
+            name: "test".to_owned(),
+            prio: 0,
+        });
+        assert!(sv.find(&("hello", 1)).is_none());
+        assert!(sv.find(&("test", 0)).is_some());
+
+        for val in sv {
+            println!("{:?}", val);
+        }
     }
 }
