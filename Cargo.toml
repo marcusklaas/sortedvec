@@ -1,6 +1,6 @@
 [package]
 name = "sortedvec"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
 edition = "2018"
 description = "a sorted vector that enables quick lookups"
