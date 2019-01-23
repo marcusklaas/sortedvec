@@ -88,6 +88,15 @@ macro_rules! def_sorted_vec {
                     .is_ok()
             }
 
+            /// Removes and returns a single value from the collection with the given key,
+            /// if it exists. This operation has linear worst-case time complexity.
+            pub fn remove(&mut self, key: &$key) -> Option<$val> {
+                self.inner
+                    .binary_search_by(|probe| ($keygen)(probe).cmp(key))
+                    .ok()
+                    .map(|idx| self.inner.remove(idx))
+            }
+
             /// Inserts a new value into the collection, maintaining the internal
             /// order invariant. This is an `O(n)` operation.
             pub fn insert(&mut self, val: $val) {
@@ -255,8 +264,11 @@ mod tests {
             name: "test".to_owned(),
             prio: 0,
         });
+
+        assert!(sv.len() == 1);
         assert!(sv.find(&("hello", 1)).is_none());
-        assert!(sv.find(&("test", 0)).is_some());
+        assert!(sv.remove(&("test", 0)).is_some());
+        assert!(sv.is_empty());
 
         for val in sv {
             println!("{:?}", val);
