@@ -94,7 +94,7 @@ macro_rules! sortedvec {
             /// logarithmic worst case time complexity.
             pub fn find(&self, key: &$key) -> Option<&$val> {
                 self.inner
-                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
+                    .binary_search_by(|probe| $keyfn(probe).cmp(key))
                     .ok()
                     .and_then(|idx| self.inner.get(idx))
             }
@@ -103,7 +103,7 @@ macro_rules! sortedvec {
             /// done in `O(log(n))` time.
             pub fn contains(&self, key: &$key) -> bool {
                 self.inner
-                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
+                    .binary_search_by(|probe| $keyfn(probe).cmp(key))
                     .is_ok()
             }
 
@@ -111,7 +111,7 @@ macro_rules! sortedvec {
             /// if it exists. This operation has linear worst-case time complexity.
             pub fn remove(&mut self, key: &$key) -> Option<$val> {
                 self.inner
-                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
+                    .binary_search_by(|probe| $keyfn(probe).cmp(key))
                     .ok()
                     .map(|idx| self.inner.remove(idx))
             }
@@ -119,10 +119,10 @@ macro_rules! sortedvec {
             /// Inserts a new value into the collection, maintaining the internal
             /// order invariant. This is an `O(n)` operation.
             pub fn insert(&mut self, val: $val) {
-                let ref key = ($keyfn)(&val);
+                let ref key = $keyfn(&val);
                 let search = self
                     .inner
-                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key));
+                    .binary_search_by(|probe| $keyfn(probe).cmp(key));
                 let idx = match search {
                     Ok(i) | Err(i) => i,
                 };
@@ -148,7 +148,7 @@ macro_rules! sortedvec {
 
             /// Removes all elements but one that resolve to the same key.
             pub fn dedup(&mut self) {
-                self.inner.dedup_by(|a, b| ($keyfn)(a) == ($keyfn)(b));
+                self.inner.dedup_by(|a, b| $keyfn(a) == $keyfn(b));
             }
 
             /// Removes and returns the greatest element with the respect to
@@ -160,8 +160,8 @@ macro_rules! sortedvec {
             // private method
             fn sort(&mut self) {
                 self.inner.sort_unstable_by(|a, b| {
-                    let lhs = ($keyfn)(a);
-                    let rhs = ($keyfn)(b);
+                    let lhs = $keyfn(a);
+                    let rhs = $keyfn(b);
                     lhs.cmp(&rhs)
                 })
             }
