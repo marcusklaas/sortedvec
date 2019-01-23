@@ -10,9 +10,13 @@ lookup tables where insertions and deletions are infrequent.
 ## Example
 
 ```rust
-use sortedvec::def_sorted_vec;
+use sortedvec::sortedvec;
 
-def_sorted_vec! { struct SortedVec: u32 => u32, |x| x }
+sortedvec! {
+    struct SortedVec {
+        fn key_deriv(x: &u32) -> u32 { *x }
+    }
+}
 
 let unsorted = vec![3, 5, 0, 10, 7, 1];
 let sorted = SortedVec::from(unsorted.clone());

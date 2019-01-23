@@ -7,6 +7,8 @@ macro_rules! gen_bench {
     ( $gen:expr, $( $i:ident; $x:expr ),* ) => {
         $(
             mod $i {
+                use std::borrow::Borrow;
+
                 #[bench]
                 fn find_vec(b: &mut test::Bencher) {
                     let vec: Vec<_> = (0u32..$x).map($gen).collect();
@@ -30,7 +32,7 @@ macro_rules! gen_bench {
                     let sortedvec = super::SortedVec::from(vec);
                     let piv = ($gen)(($x / 2).saturating_sub(1));
 
-                    b.iter(|| sortedvec.find(&piv));
+                    b.iter(|| sortedvec.find(&piv.borrow()));
                 }
             }
         )*
@@ -39,8 +41,11 @@ macro_rules! gen_bench {
 
 #[cfg(test)]
 mod string_bench {
-    fn key(x: &String) -> &str { &x[..] }
-    sortedvec::def_sorted_vec! { struct SortedVec: String => str, key }
+    sortedvec::sortedvec! {
+        struct SortedVec {
+            fn key_deriv(x: &String) -> &str { &x[..] }
+        }
+    }
 
     gen_bench!(
         |x: u32| format!("{:04}", x),
@@ -64,8 +69,12 @@ mod string_bench {
 
 #[cfg(test)]
 mod int_bench {
-    sortedvec::def_sorted_vec! { struct SortedVec: u32 => u32, |x| x }
- 
+    sortedvec::sortedvec! {
+        struct SortedVec {
+            fn key_deriv(x: &u32) -> u32 { *x }
+        }
+    }
+
     gen_bench!(
         |x: u32| x,
 

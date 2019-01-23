@@ -1,17 +1,19 @@
-use crate::def_sorted_vec;
+use crate::sortedvec;
 
 /// Example key
-#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct K;
 
 /// Example value
+#[derive(Debug, Clone)]
 pub struct T {
     key: K,
 }
 
-fn key(t: &T) -> K { t.key }
-
-def_sorted_vec! {
+sortedvec! {
     /// Sorted vector type that provides quick access to `T`s through `K`s.
-    pub struct ExampleSortedVec: T => K, key
+    #[derive(Debug, Clone)]
+    pub struct ExampleSortedVec {
+        fn key(t: &T) -> K { t.key }
+    }
 }

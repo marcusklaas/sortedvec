@@ -1,13 +1,18 @@
-//! This crate exposes a single macro, [`def_sorted_vec`]. It generates a lookup table
-//! that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
+//! This crate exposes a single macro, [`sortedvec`]. It generates a lookup
+//! table on `Ord` keys that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
 //! and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
-//! lookup tables where additions and deletions are infrequent.
+//! lookup tables where insertions and deletions are infrequent.
+
 //!
 //! # Example
 //! ```
-//! use sortedvec::def_sorted_vec;
-//! 
-//! def_sorted_vec! { struct SortedVec: u32 => u32, |x| x }
+//! use sortedvec::sortedvec;
+//!
+//! sortedvec! {
+//!     struct SortedVec {
+//!         fn key_deriv(x: &u32) -> u32 { *x }
+//!     }
+//! }
 //!
 //! let unsorted = vec![3, 5, 0, 10, 7, 1];
 //! let sorted = SortedVec::from(unsorted.clone());
@@ -25,46 +30,60 @@
 pub mod example;
 
 /// A macro that defines a sorted vector data collection.
-/// 
+///
 /// The generated struct is specific to the given keys and value types. To create the struct,
 /// four bits are required:
 /// - a struct name,
 /// - a value type,
 /// - a key type. Since we will sort on these internally, this type must implement `Ord`,
 /// - a key extraction function of type `FnMut(&T) -> K`.
-/// 
+///
 /// Matches the following input:
 /// ```text
-/// ( $(#[$attr:meta])* $v:vis struct $name:ident: $val:ty => $key:ty, $keygen:expr )
-/// ``` 
-/// 
+/// $(#[$attr:meta])*
+/// $v:vis struct $name:ident {
+///     fn $keyfn:ident ($i:ident : & $val:ty) -> $key:ty {
+///         $keyexpr:expr
+///     } $(,)?
+/// }
+/// ```
+///
 /// # Example
 /// ```rust
-/// use sortedvec::def_sorted_vec;
-/// 
+/// use sortedvec::sortedvec;
+///
 /// /// Example key
 /// #[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Copy)]
 /// pub struct K;
-/// 
+///
 /// /// Example value
 /// #[derive(Debug, Clone)]
 /// pub struct T {
 ///     key: K,
 /// }
-/// 
-/// fn key(t: &T) -> K { t.key }
-/// 
-/// def_sorted_vec! {
+///
+/// sortedvec! {
 ///     /// Sorted vector type that provides quick access to `T`s through `K`s.
 ///     #[derive(Debug, Clone)]
-///     pub struct ExampleSortedVec: T => K, key
+///     pub struct ExampleSortedVec {
+///         fn key(t: &T) -> K { t.key }
+///     }
 /// }
-/// 
+///
 /// let sv = ExampleSortedVec::default();
 /// ```
 #[macro_export]
-macro_rules! def_sorted_vec {
-    ( $(#[$attr:meta])* $v:vis struct $name:ident: $val:ty => $key:ty, $keygen:expr ) => {
+macro_rules! sortedvec {
+(
+    $(#[$attr:meta])*
+    $v:vis struct $name:ident {
+        fn $keyfn:ident ($i:ident : & $val:ty) -> $key:ty {
+            $keyexpr:expr
+        } $(,)?
+    }
+) => {
+        fn $keyfn ($i : &$val) -> $key { $keyexpr }
+
         $(#[$attr])*
         $v struct $name {
             inner: Vec<$val>,
@@ -75,7 +94,7 @@ macro_rules! def_sorted_vec {
             /// logarithmic worst case time complexity.
             pub fn find(&self, key: &$key) -> Option<&$val> {
                 self.inner
-                    .binary_search_by(|probe| ($keygen)(probe).cmp(key))
+                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
                     .ok()
                     .and_then(|idx| self.inner.get(idx))
             }
@@ -84,7 +103,7 @@ macro_rules! def_sorted_vec {
             /// done in `O(log(n))` time.
             pub fn contains(&self, key: &$key) -> bool {
                 self.inner
-                    .binary_search_by(|probe| ($keygen)(probe).cmp(key))
+                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
                     .is_ok()
             }
 
@@ -92,7 +111,7 @@ macro_rules! def_sorted_vec {
             /// if it exists. This operation has linear worst-case time complexity.
             pub fn remove(&mut self, key: &$key) -> Option<$val> {
                 self.inner
-                    .binary_search_by(|probe| ($keygen)(probe).cmp(key))
+                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key))
                     .ok()
                     .map(|idx| self.inner.remove(idx))
             }
@@ -100,10 +119,10 @@ macro_rules! def_sorted_vec {
             /// Inserts a new value into the collection, maintaining the internal
             /// order invariant. This is an `O(n)` operation.
             pub fn insert(&mut self, val: $val) {
-                let ref key = ($keygen)(&val);
+                let ref key = ($keyfn)(&val);
                 let search = self
                     .inner
-                    .binary_search_by(|probe| ($keygen)(probe).cmp(key));
+                    .binary_search_by(|probe| ($keyfn)(probe).cmp(key));
                 let idx = match search {
                     Ok(i) | Err(i) => i,
                 };
@@ -129,7 +148,7 @@ macro_rules! def_sorted_vec {
 
             /// Removes all elements but one that resolve to the same key.
             pub fn dedup(&mut self) {
-                self.inner.dedup_by(|a, b| ($keygen)(a) == ($keygen)(b));
+                self.inner.dedup_by(|a, b| ($keyfn)(a) == ($keyfn)(b));
             }
 
             /// Removes and returns the greatest element with the respect to
@@ -141,8 +160,8 @@ macro_rules! def_sorted_vec {
             // private method
             fn sort(&mut self) {
                 self.inner.sort_unstable_by(|a, b| {
-                    let lhs = ($keygen)(a);
-                    let rhs = ($keygen)(b);
+                    let lhs = ($keyfn)(a);
+                    let rhs = ($keyfn)(b);
                     lhs.cmp(&rhs)
                 })
             }
@@ -223,13 +242,15 @@ macro_rules! def_sorted_vec {
 }
 
 #[cfg(test)]
+#[allow(unused_variables)]
 mod tests {
-    #![allow(unused_variables)]
     #[test]
     fn simple() {
-        def_sorted_vec! {
+        sortedvec! {
             #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Hash)]
-            pub struct TestVec: u32 => u32, |x: &u32| *x
+            pub struct TestVec {
+                fn keyderiv(x: &u32) -> u32 { *x }
+            }
         }
 
         let sv: TestVec = (0u32..10).collect();
@@ -247,15 +268,15 @@ mod tests {
             prio: u64,
         }
 
-        fn key_deriv(val: &SomeComplexValue) -> (&str, u64) {
-            (val.name.as_str(), val.prio)
-        }
-
-        def_sorted_vec! {
+        sortedvec! {
             /// Vec of `SomeComplexValues` that allows quick
             /// lookup by (name, prio) keys
             #[derive(Debug)]
-            struct ComplexMap: SomeComplexValue => (&str, u64), key_deriv
+            struct ComplexMap {
+                fn key_deriv(val: &SomeComplexValue) -> (&str, u64) {
+                    (val.name.as_str(), val.prio)
+                }
+            }
         }
 
         let mut sv = ComplexMap::default();
