@@ -29,6 +29,8 @@
 /// Example of a collection defined using the `sortedvec` macro.
 pub mod example;
 
+pub mod list_experiment;
+
 /// A macro that defines a sorted vector data collection.
 ///
 /// The generated struct is specific to the given keys and value types. To create the struct,
