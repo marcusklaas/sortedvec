@@ -93,4 +93,22 @@ mod int_bench {
         s0500;500u32,
         s1000;1000u32
     );
+
+    use faster::*;
+
+    #[bench]
+    fn common_prefix(b: &mut test::Bencher) {
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+
+        b.iter(|| a.iter().zip(c.iter()).position(|(&f, &e)| e != f));
+    }
+
+    #[bench]
+    fn common_prefix_simd(b: &mut test::Bencher) {
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+
+        b.iter(|| (a[..].simd_iter(u8s(0)), c[..].simd_iter(u8s(0))).zip().simd_map(|(a, b)| a ^ b).position(|x| x != Default::default()));
+    }
 }

@@ -10,3 +10,4 @@ keywords = [ "sortedvec", "lookup", "table", "datastructure", "vec" ]
 readme = "readme.md"
 
 [dependencies]
+faster = { git = "https://github.com/AdamNiederer/faster" }

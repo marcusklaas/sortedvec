@@ -104,6 +104,7 @@ impl<A> SliceOrd<A> for [A]
 #[allow(unused_variables)]
 mod tests {
     use super::*;
+    use faster::*;
 
     #[test]
     fn find_string() {
@@ -111,5 +112,18 @@ mod tests {
 
         assert!(sorted_vec.find("abc").is_some());
         assert!(sorted_vec.find("aa").is_none())
+    }
+
+    #[test]
+    fn common_prefix_simd() {
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+
+        let common_prefix = (a.simd_iter(u8s(1)), c.simd_iter(u8s(0)))
+            .zip()
+            .simd_map(|(a, b)| a ^ b)
+            .position(|x| x != Default::default());
+
+        assert_eq!(Some(997), common_prefix);
     }
 }
