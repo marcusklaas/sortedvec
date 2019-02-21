@@ -96,19 +96,31 @@ mod int_bench {
 
     use faster::*;
 
+    const SHARED_LEN: usize = 100;
+
     #[bench]
     fn common_prefix(b: &mut test::Bencher) {
-        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
-        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(4u8)).collect();
 
-        b.iter(|| a.iter().zip(c.iter()).position(|(&f, &e)| e != f));
+        b.iter(|| assert_eq!(SHARED_LEN, a.iter().zip(c.iter()).take_while(|(f, e)| e == f).count()));
+    }
+
+    fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+        let shared_len = std::cmp::min(a.len(), b.len());
+        let iter = (a[..shared_len].simd_iter(u8s(0)), b[..shared_len].simd_iter(u8s(0))).zip();
+        let width = iter.width();
+
+        let mut prefix_len = iter.simd_map(|(a, b)| a^b).take_while(|&x| x == Default::default()).count() * width;
+        prefix_len += a[prefix_len..shared_len].iter().zip(a[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count();
+        prefix_len
     }
 
     #[bench]
     fn common_prefix_simd(b: &mut test::Bencher) {
-        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
-        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(4u8)).collect();
 
-        b.iter(|| (a[..].simd_iter(u8s(0)), c[..].simd_iter(u8s(0))).zip().simd_map(|(a, b)| a ^ b).position(|x| x != Default::default()));
+        b.iter(|| assert_eq!(SHARED_LEN, simd_common_prefix_len(&a, &c)));
     }
 }

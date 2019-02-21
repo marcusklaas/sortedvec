@@ -106,6 +106,17 @@ mod tests {
     use super::*;
     use faster::*;
 
+    fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+        let shared_len = std::cmp::min(a.len(), b.len());
+        let mut iter = (a[..shared_len].simd_iter(u8s(0)), b[..shared_len].simd_iter(u8s(0))).zip();
+        let width = iter.width();
+
+        let mut prefix_len = iter.simd_map(|(a, b)| a^b).take_while(|&x| x == Default::default()).count() * width;
+        prefix_len += a[prefix_len..shared_len].iter().zip(a[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count();
+        
+        prefix_len
+    }
+
     #[test]
     fn find_string() {
         let sorted_vec = SortedVecOfListLikes::from_vec(vec!["abc".into(), "aaa".into(), "bcd".into(), "a".into(), "bda".into(), "aacb".into()]);
@@ -116,14 +127,11 @@ mod tests {
 
     #[test]
     fn common_prefix_simd() {
-        let a: Vec<u8> = ::std::iter::repeat(127u8).take(1000).chain(Some(5u8)).collect();
-        let c: Vec<u8> = ::std::iter::repeat(127u8).take(997).chain(Some(4u8)).collect();
+        let shared_len = 14;
 
-        let common_prefix = (a.simd_iter(u8s(1)), c.simd_iter(u8s(0)))
-            .zip()
-            .simd_map(|(a, b)| a ^ b)
-            .position(|x| x != Default::default());
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(shared_len).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(shared_len).chain(Some(4u8)).collect();
 
-        assert_eq!(Some(997), common_prefix);
+        assert_eq!(shared_len, simd_common_prefix_len(&a, &c));
     }
 }
