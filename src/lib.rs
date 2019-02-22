@@ -25,6 +25,16 @@
 //! let sorted_contains_six: Option<_> = sorted.find(&6);
 //! assert!(sorted_contains_six.is_none());
 //! ```
+//! 
+
+#![feature(specialization)]
+#![allow(dead_code)]
+
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
 
 /// Example of a collection defined using the `sortedvec` macro.
 pub mod example;

@@ -11,3 +11,7 @@ readme = "readme.md"
 
 [dependencies]
 faster = { git = "https://github.com/AdamNiederer/faster" }
+
+[dev-dependencies]
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
