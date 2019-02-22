@@ -33,7 +33,6 @@ impl SortedVecOfListLikes
         }
         let key_as_slice = init_key.as_ref();
         let mut base = 0usize;
-        // TODO: actually use shared prefix length to only compare subslices
         while size > 1 {
             let half = size / 2;
             let mid = base + half;
@@ -43,8 +42,7 @@ impl SortedVecOfListLikes
             // mid < size: mid = size / 2 + size / 4 + size / 8 ...
             let elt = unsafe { self.inner.get_unchecked(mid) };
             let key = sort_key(elt);
-            // let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
-            let (prefix_len, cmp) = compare_slices(&key[prefix_skip..], &key_as_slice[prefix_skip..]);
+            let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
             base = match cmp {
                 Ordering::Greater => {
                     upper_shared_prefix = prefix_skip + prefix_len; 
@@ -62,14 +60,13 @@ impl SortedVecOfListLikes
         // base is always in [0, size) because base <= mid.
         let elt = unsafe { self.inner.get_unchecked(base) };
         let key = &sort_key(&elt)[prefix_skip..];
-        //let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
-        let (_prefix, cmp) = compare_slices(key, &key_as_slice[prefix_skip..]);
+        let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
         if cmp == Ordering::Equal { Some(elt) } else { None }
     }
 }
 
 // intermediate trait for specialization of slice's Ord.
-// comparisons additionall return the length of the longest common prefix
+// comparisons additionally return the length of the longest common prefix
 trait SliceOrd<B> {
     fn compare(&self, other: &[B]) -> (usize, Ordering);
 }
@@ -93,34 +90,17 @@ impl<A> SliceOrd<A> for [A]
             }
         }
 
-        dbg!(self.len());
-        dbg!(other.len());
-        dbg!(self.len().cmp(&other.len()));
-
         (prefix_len, self.len().cmp(&other.len()))
     }
 }
 
-// TODO: we can specialize on [u8] using SIMD
-
-// // memcmp compares a sequence of unsigned bytes lexicographically.
-// // this matches the order we want for [u8], but no others (not even [i8]).
-// impl SliceOrd<u8> for [u8] {
-//     #[inline]
-//     fn compare(&self, other: &[u8]) -> Ordering {
-//         let order = unsafe {
-//             memcmp(self.as_ptr(), other.as_ptr(),
-//                    cmp::min(self.len(), other.len()))
-//         };
-//         if order == 0 {
-//             self.len().cmp(&other.len())
-//         } else if order < 0 {
-//             Less
-//         } else {
-//             Greater
-//         }
-//     }
-// }
+// we can specialize on [u8] using SIMD
+impl SliceOrd<u8> for [u8] {
+    #[inline]
+    fn compare(&self, other: &[u8]) -> (usize, Ordering) {
+        compare_slices(self, other)
+    }
+}
 
 pub fn usize_common_prefix_len<T: 'static>(a: &[u8], b: &[u8]) -> usize
     where &'static T: PartialEq {
@@ -263,7 +243,10 @@ mod tests {
 
     #[test]
     fn bad_case() {
-        let case = &["\u{80}", "\u{80}", "\u{80}", "\u{80}", "", "\u{80}", "", "", "¤", "", "", "\u{80}", "", "\u{80}", "", "\u{80}", "", "¤\u{0}", "¥", "", "", "¥", "", "\u{80}", "", "", "¥", "\u{80}", ""];
+        let case = &[
+            "\u{80}", "\u{80}", "\u{80}", "\u{80}", "", "\u{80}", "", "", "¤", "", "", "\u{80}",
+            "", "\u{80}", "", "\u{80}", "", "¤\u{0}", "¥", "", "", "¥", "", "\u{80}", "", "", "¥", "\u{80}", ""
+        ];
         let sorted = SortedVecOfListLikes::from_vec(case.into_iter().map(|&x| x.to_owned()).collect());
 
         for s in case {
