@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use faster::*;
 
 pub struct SortedVecOfListLikes {
     inner: Vec<String>
@@ -25,6 +26,8 @@ impl SortedVecOfListLikes
     /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
     pub fn find<E: AsRef<[u8]>>(&self, key: E) -> Option<&String> {
         let mut size = self.inner.len();
+        let mut upper_shared_prefix = 0;
+        let mut lower_shared_prefix = 0;
         if size == 0 {
             return None;
         }
@@ -34,18 +37,33 @@ impl SortedVecOfListLikes
         while size > 1 {
             let half = size / 2;
             let mid = base + half;
+            let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
             // mid is always in [0, size), that means mid is >= 0 and < size.
             // mid >= 0: by definition
             // mid < size: mid = size / 2 + size / 4 + size / 8 ...
-            let key = sort_key(unsafe { self.inner.get_unchecked(mid) });
-            let (_prefix, cmp) = key.compare(key_as_slice);
-            base = if cmp == Ordering::Greater { base } else { mid };
+            let elt = unsafe { self.inner.get_unchecked(mid) };
+            let key = sort_key(elt);
+            let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
+            base = match cmp {
+                Ordering::Greater => {
+                    upper_shared_prefix += prefix_len; 
+                    base
+                }
+                Ordering::Less => {
+                    lower_shared_prefix += prefix_len; 
+                    mid
+                }
+                Ordering::Equal => {
+                    return Some(elt);
+                }
+            };
             size -= half;
         }
+        let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
         // base is always in [0, size) because base <= mid.
         let elt = unsafe { self.inner.get_unchecked(base) };
-        let key = sort_key(&elt);
-        let (_prefix, cmp) = key.compare(key_as_slice);
+        let key = &sort_key(&elt)[prefix_skip..];
+        let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
         if cmp == Ordering::Equal { Some(elt) } else { None }
     }
 }
@@ -99,6 +117,108 @@ impl<A> SliceOrd<A> for [A]
 //         }
 //     }
 // }
+
+pub fn usize_common_prefix_len<T: 'static>(a: &[u8], b: &[u8]) -> usize
+    where &'static T: PartialEq {
+    let usize_width = std::mem::size_of::<T>();
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let usize_len = shared_len / usize_width;
+
+    let a_usize: &[T] = unsafe { std::mem::transmute(a) };
+    let b_usize: &[T] = unsafe { std::mem::transmute(b) };
+
+    let prefix_len = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter()).take_while(|(a, b)| *a == b).count() * usize_width;
+    prefix_len + a[prefix_len..shared_len].iter().zip(b[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count()
+}
+
+pub fn usize_unsafe_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+    let usize_width = std::mem::size_of::<usize>();
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let usize_len = shared_len / usize_width;
+
+    let a_usize: &[usize] = unsafe { std::mem::transmute(a) };
+    let b_usize: &[usize] = unsafe { std::mem::transmute(b) };
+
+    // let mut iter = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter());
+    // let mut counter = 0;
+    // while let Some((a, b)) = iter.next() {
+    //     if a == b {
+    //         counter += usize_width;
+    //     } else {
+    //         let xor = usize::to_le(a^b);
+    //         return std::cmp::min(shared_len, counter + xor.trailing_zeros() as usize / 8);
+    //     }
+    // }
+    // std::cmp::min(shared_len, counter)
+    let prefix_len = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter()).take_while(|(a, b)| a == b).count();
+    let total_len = prefix_len * usize_width;
+
+    if total_len < shared_len {
+        let xor = unsafe { a_usize.get_unchecked(prefix_len) ^ b_usize.get_unchecked(prefix_len) };
+        std::cmp::min(shared_len, prefix_len * usize_width + usize::to_le(xor.trailing_zeros() as usize) / 8)
+    } else {
+        total_len
+    }
+}
+
+pub fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+    let shared_len = std::cmp::min(a.len(), b.len());
+    a[..shared_len].iter().zip(b[..shared_len].iter()).take_while(|(a, b)| a == b).count()
+}
+
+pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let iter = (a[..shared_len].simd_iter(u8s(0)), b[..shared_len].simd_iter(u8s(0))).zip();
+    let width = iter.width();
+
+    let mut prefix_len = iter.simd_map(|(a, b)| a^b).take_while(|&x| x == Default::default()).count() * width;
+    prefix_len += a[prefix_len..shared_len].iter().zip(b[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count();
+    prefix_len
+}
+
+pub fn simd_alternative(a: &[u8], b: &[u8]) -> usize {
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let first_iter = a[..shared_len].simd_iter(u8s(0));
+    let width = first_iter.width();
+
+    if width <= shared_len {
+        let prefix_len = if shared_len > width {
+            let combined_iter = (first_iter, b[..shared_len].simd_iter(u8s(0))).zip().simd_map(|(a, b)| a^b);
+            combined_iter.take_while(|&x| x == Default::default()).count() * width
+        } else {
+            0
+        };
+
+        if prefix_len < shared_len {
+            let ix = std::cmp::min(shared_len - width, prefix_len);
+            let compared = unsafe {
+                let a_loaded = a.load_unchecked(ix);
+                let b_loaded = b.load_unchecked(ix);
+                a_loaded.eq(b_loaded)
+            };
+            let bitmask = !compared.bitmask();
+
+            ix + bitmask.trailing_zeros() as usize
+        } else {
+            prefix_len
+        }
+    } else {
+        usize_unsafe_common_prefix_len(a, b)
+    }
+}
+
+fn compare_slices(a: &[u8], b: &[u8]) -> (usize, Ordering) {
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let shared_prefix_len = simd_alternative(a, b);
+
+    if shared_prefix_len < shared_len {
+        let cmp = a[shared_prefix_len].cmp(&b[shared_prefix_len]);
+        (shared_prefix_len, cmp)
+    } else {
+        let len_ord = a.len().cmp(&b.len());
+        (shared_prefix_len, len_ord)
+    }
+}
 
 #[cfg(test)]
 #[allow(unused_variables)]
