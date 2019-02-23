@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use faster::*;
 
 #[macro_export]
@@ -11,6 +10,8 @@ macro_rules! sortedvec_slicekey {
         } $(,)?
     }
 ) => {
+        // use $crate::list_experiment::SliceOrd;
+
         fn $keyfn ($i : &$val) -> & [ $key ] { $keyexpr }
 
         $(#[$attr])*
@@ -21,7 +22,7 @@ macro_rules! sortedvec_slicekey {
         impl $name {
             /// Internal method for lookups by key, returning the index where it is found
             /// or where it should be inserted if it is not found.
-            #[inline]
+            #[inline(always)]
             fn try_find<E: AsRef<[$key]>>(&self, init_key: E) -> Result<usize, usize> {
                 let mut size = self.inner.len();
                 let mut upper_shared_prefix = 0;
@@ -39,31 +40,32 @@ macro_rules! sortedvec_slicekey {
                     // mid >= 0: by definition
                     // mid < size: mid = size / 2 + size / 4 + size / 8 ...
                     let elt = unsafe { self.inner.get_unchecked(mid) };
-                    let key = sort_key(elt);
+                    let key = $keyfn(elt);
                     let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
                     base = match cmp {
-                        Ordering::Greater => {
+                        std::cmp::Ordering::Greater => {
                             upper_shared_prefix = prefix_skip + prefix_len; 
                             base
                         }
-                        Ordering::Less => {
+                        std::cmp::Ordering::Less => {
                             lower_shared_prefix = prefix_skip + prefix_len; 
                             mid
                         }
-                        Ordering::Equal => return Ok(mid),
+                        std::cmp::Ordering::Equal => return Ok(mid),
                     };
                     size -= half;
                 }
                 let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
                 // base is always in [0, size) because base <= mid.
                 let elt = unsafe { self.inner.get_unchecked(base) };
-                let key = &sort_key(&elt)[prefix_skip..];
+                let key = &$keyfn(&elt)[prefix_skip..];
                 let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
-                if cmp == Ordering::Equal { Ok(base) } else { Err(base) }
+                if cmp == std::cmp::Ordering::Equal { Ok(base) } else { Err(base) }
             }
 
             /// Finds and returns reference to element with given key, if it exists.
             /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
+            #[inline(always)]
             pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
                 self.try_find(init_key).ok().map(|ix| unsafe { self.inner.get_unchecked(ix) })
             }
@@ -196,24 +198,16 @@ macro_rules! sortedvec_slicekey {
     }
 }
 
-sortedvec_slicekey! {
-    /// Sorted vector type that provides quick access to `T`s through `K`s.
-    #[derive(Debug, Clone)]
-    pub struct SortedVecOfListLikes {
-        fn sort_key(t: &String) -> &[u8] { t.as_bytes() }
-    }
-}
-
 // intermediate trait for specialization of slice's Ord.
 // comparisons additionally return the length of the longest common prefix
-trait SliceOrd<B> {
-    fn compare(&self, other: &[B]) -> (usize, Ordering);
+pub trait SliceOrd<B> {
+    fn compare(&self, other: &[B]) -> (usize, std::cmp::Ordering);
 }
 
 impl<A> SliceOrd<A> for [A]
     where A: Ord
 {
-    default fn compare(&self, other: &[A]) -> (usize, Ordering) {
+    default fn compare(&self, other: &[A]) -> (usize, std::cmp::Ordering) {
         let l = std::cmp::min(self.len(), other.len());
         let mut prefix_len = 0;
 
@@ -224,7 +218,7 @@ impl<A> SliceOrd<A> for [A]
 
         for i in 0..l {
             match lhs[i].cmp(&rhs[i]) {
-                Ordering::Equal => { prefix_len += 1 }
+                std::cmp::Ordering::Equal => { prefix_len += 1 }
                 non_eq => return (prefix_len, non_eq),
             }
         }
@@ -235,8 +229,8 @@ impl<A> SliceOrd<A> for [A]
 
 // Specialize on [u8] using SIMD
 impl SliceOrd<u8> for [u8] {
-    #[inline]
-    fn compare(&self, other: &[u8]) -> (usize, Ordering) {
+    #[inline(always)]
+    fn compare(&self, other: &[u8]) -> (usize, std::cmp::Ordering) {
         let shared_len = std::cmp::min(self.len(), other.len());
         let shared_prefix_len = simd_common_prefix_len(self, other);
 
@@ -270,7 +264,7 @@ fn usize_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     shared_len
 }
 
-fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     let shared_len = std::cmp::min(a.len(), b.len());
     let first_iter = a[..shared_len].simd_iter(u8s(0));
     let width = first_iter.width();
@@ -302,9 +296,16 @@ fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
 }
 
 #[cfg(test)]
-#[allow(unused_variables)]
 mod tests {
     use super::*;
+
+    sortedvec_slicekey! {
+        /// Sorted vector type that provides quick access to `T`s through `K`s.
+        #[derive(Debug, Clone)]
+        pub struct SortedVecOfListLikes {
+            fn sort_key(t: &String) -> &[u8] { t.as_bytes() }
+        }
+    }
 
     // naive implementation of u8 slice compare for reference
     fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {

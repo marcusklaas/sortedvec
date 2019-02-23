@@ -94,3 +94,246 @@ mod int_bench {
         s1000;1000u32
     );
 }
+
+
+#[cfg(test)]
+mod slicekey_bench {
+    static LIB: &[&str] = &[
+        "1862_Chicago_mayoral_election",
+        "1862_City_of_Auckland_West_by-election",
+        "1862_City_of_Dunedin_by-election",
+        "1862_City_of_Dunedin_by-elections",
+        "1862_Coleraine_by-election",
+        "1862_Constitution_of_Liechtenstein",
+        "1862_Dakota_War",
+        "1862_Drayton_and_Toowoomba_colonial_by-election",
+        "1862_Dunedin_by-election",
+        "1862_Dunedin_by-elections",
+        "1862_Eastern_Downs_colonial_by-election",
+        "1862_Ellesmere_by-election",
+        "1862_English_cricket_season",
+        "1862_Grand_National",
+        "1862_Greek_head_of_state_referendum",
+        "1862_Greek_legislative_election",
+        "1862_Hampden_by-election",
+        "1862_Heathcote_by-election",
+        "1862_International_Exhibition",
+        "1862_Liverpool_Town_Council_election",
+        "1862_Montgomeryshire_by-election",
+        "1862_New_Jersey_gubernatorial_election",
+        "1862_New_Plymouth_by-election",
+        "1862_New_York_state_election",
+        "1862_Norwegian_parliamentary_election",
+        "1862_Open_Championship",
+        "1862_Oregon_gubernatorial_election",
+        "1862_South_Australian_colonial_election",
+        "1862_Town_of_New_Plymouth_by-election",
+        "1862_United_States_House_of_Representatives_election_in_Delaware",
+        "1862_United_States_House_of_Representatives_election_in_Kansas",
+        "1862_United_States_House_of_Representatives_election_in_Oregon",
+        "1862_United_States_House_of_Representatives_elections_in_Illinois",
+        "1862_United_States_House_of_Representatives_elections_in_Indiana",
+        "1862_United_States_House_of_Representatives_elections_in_Iowa",
+        "1862_United_States_House_of_Representatives_elections_in_Maine",
+        "1862_United_States_House_of_Representatives_elections_in_Massachusetts",
+        "1862_United_States_House_of_Representatives_elections_in_Michigan",
+        "1862_United_States_House_of_Representatives_elections_in_Minnesota",
+        "1862_United_States_House_of_Representatives_elections_in_Missouri",
+        "1862_United_States_House_of_Representatives_elections_in_New_Jersey",
+        "1862_United_States_House_of_Representatives_elections_in_New_York",
+        "1862_United_States_House_of_Representatives_elections_in_Ohio",
+        "1862_United_States_House_of_Representatives_elections_in_Pennsylvania",
+        "1862_United_States_House_of_Representatives_elections_in_Wisconsin",
+        "1862_United_States_Senate_election_in_Indiana",
+        "1862_United_States_Senate_election_in_Missouri",
+        "1862_United_States_Senate_election_in_Rhode_Island",
+        "1862_United_States_Senate_election_in_Vermont",
+        "1862_United_States_Senate_special_election_in_Michigan",
+        "1862_United_States_Senate_special_election_in_Oregon",
+        "1862_United_States_Senate_special_election_in_Rhode_Island",
+        "1862_United_States_elections",
+        "1862_Virginia's_1st_congressional_district_special_election",
+        "1862_Wardsend_Cemetery_riot",
+        "1862_Warwick_colonial_by-election",
+        "1862_West_Moreton_colonial_by-election",
+        "1862_and_1863_United_States_House_of_Representatives_elections",
+        "1862_and_1863_United_States_Senate_elections",
+        "1862_congressional_elections",
+        "1862_in_Australia",
+        "1862_in_Australian_literature",
+        "1862_in_Belgium",
+        "1862_in_Brazil",
+        "1862_in_Canada",
+        "1862_in_Chile",
+        "1862_in_China",
+        "1862_in_Denmark",
+        "1862_in_France",
+        "1862_in_Germany",
+        "1862_in_India",
+        "1862_in_Ireland",
+        "1862_in_Mexico",
+        "1862_in_New_Zealand",
+        "1862_in_Norway",
+        "1862_in_Portugal",
+        "1862_in_Russia",
+        "1862_in_Scotland",
+        "1862_in_Siam",
+        "1862_in_South_Africa",
+        "1862_in_Sweden",
+        "1862_in_Wales",
+        "1862_in_archaeology",
+        "1862_in_architecture",
+        "1862_in_art",
+        "1862_in_baseball",
+        "1862_in_birding_and_ornithology",
+        "1862_in_film",
+        "1862_in_literature",
+        "1862_in_music",
+        "1862_in_paleontology",
+        "1862_in_poetry",
+        "1862_in_rail_transport",
+        "1862_in_science",
+        "1862_in_sociology",
+        "1862_in_sports",
+        "1862_in_the_American_Old_West",
+        "1862_in_the_UK",
+        "1862_in_the_US",
+        "1862_in_the_USA",
+        "1862_in_the_United_Kingdom",
+        "1862_in_the_United_States",
+        "1862_in_the_United_States_of_America",
+        "1862–1864_Atlantic_hurricane_seasons",
+        "1862–1910_Argentine_presidential_elections",
+        "1863",
+        "1863-1875_cholera_pandemic",
+        "1863-64_Australian_cricket_season",
+        "1863-64_New_Zealand_cricket_season",
+        "1863-75_cholera_pandemic",
+        "18631_Maurogherardini",
+        "18632_Danielsson",
+        "18634_Champigneulles",
+        "18635_Frouard",
+        "18636_Villedepompey",
+        "18637_Liverdun",
+        "18638_Nouet",
+        "18639_Aoyunzhiyuanzhe",
+        "1863_(number)",
+        "1863_(year)",
+        "1863_AD",
+        "1863_AHS",
+        "1863_Akaroa_by-election",
+        "1863_Antinous",
+        "1863_Atlantic_hurricane_season",
+        "1863_BC",
+        "1863_Belgian_general_election",
+        "1863_CE",
+        "1863_California_gubernatorial_election",
+        "1863_Chicago_mayoral_election",
+        "1863_Colony_of_Vancouver_Island_election",
+        "1863_Confederate_Congressional_election",
+        "1863_Confederate_States_House_of_Representatives_elections",
+        "1863_Costa_Rican_general_election",
+        "1863_Delaware's_at-large_congressional_district_special_election",
+        "1863_Dunedin_and_Suburbs_North_by-election",
+        "1863_Dunedin_and_Suburbs_South_by-election",
+        "1863_East_Moreton_colonial_by-election",
+        "1863_English_cricket_season",
+        "1863_French_legislative_election",
+        "1863_Grand_National",
+        "1863_Hampden_by-election",
+        "1863_Hawke's_Bay_earthquake",
+        "1863_Heathcote_by-election",
+        "1863_Insurrection",
+        "1863_Jujuy_earthquake",
+        "1863_Kaiapoi_by-election",
+        "1863_Liberian_general_election",
+        "1863_Liverpool_Town_Council_election",
+        "1863_Louisiana_gubernatorial_election_(Confederate)",
+        "1863_Mexican_emperor_referendum",
+        "1863_Minnesota_gubernatorial_election",
+        "1863_New_Plymouth_by-election",
+        "1863_New_York_City_draft_riots",
+        "1863_New_York_state_election",
+        "1863_Open_Championship",
+        "1863_Orange_Free_State_presidential_election",
+        "1863_Pennsylvania_gubernatorial_election",
+        "1863_Polish_revolution",
+        "1863_Port_Curtis_colonial_by-election",
+        "1863_Queensland_colonial_election",
+        "1863_State_of_the_Union",
+        "1863_State_of_the_Union_Address",
+        "1863_Swiss_federal_election",
+        "1863_Texas_gubernatorial_election",
+        "1863_Town_of_New_Plymouth_by-election",
+        "1863_United_States_House_of_Representatives_election_in_California",
+        "1863_United_States_House_of_Representatives_elections_in_California",
+        "1863_United_States_House_of_Representatives_elections_in_Connecticut",
+        "1863_United_States_House_of_Representatives_elections_in_Kentucky",
+        "1863_United_States_House_of_Representatives_elections_in_Maryland",
+        "1863_United_States_House_of_Representatives_elections_in_New_Hampshire",
+        "1863_United_States_House_of_Representatives_elections_in_Rhode_Island",
+        "1863_United_States_House_of_Representatives_elections_in_Vermont",
+        "1863_United_States_House_of_Representatives_elections_in_West_Virginia",
+        "1863_United_States_Senate_election_in_Connecticut",
+        "1863_United_States_Senate_election_in_Delaware",
+        "1863_United_States_Senate_election_in_Maine",
+        "1863_United_States_Senate_election_in_Massachusetts",
+        "1863_United_States_Senate_election_in_Michigan",
+        "1863_United_States_Senate_election_in_Minnesota",
+        "1863_United_States_Senate_election_in_New_York",
+        "1863_United_States_Senate_election_in_Ohio",
+        "1863_United_States_Senate_election_in_Pennsylvania",
+        "1863_United_States_Senate_election_in_Virginia",
+        "1863_United_States_Senate_election_in_Wisconsin",
+        "1863_United_States_Senate_elections_in_West_Virginia",
+        "1863_United_States_Senate_special_election_in_Illinois",
+        "1863_United_States_Senate_special_election_in_Indiana",
+        "1863_United_States_Senate_special_election_in_Missouri",
+        "1863_United_States_Senate_special_election_in_New_Jersey",
+    ];
+
+    sortedvec::sortedvec! {
+        /// Sorted vector type that provides quick access to `T`s through `K`s.
+        #[derive(Debug, Clone)]
+        pub struct SortedVec {
+            fn sort_key(t: &String) -> &str { &t[..] }
+        }
+    }
+
+    #[bench]
+    fn find_wiki_article_regular(b: &mut test::Bencher) {
+        let sortedvec: SortedVec = LIB.into_iter().map(|&x| x.to_owned()).collect();
+
+        b.iter(|| sortedvec.find(&"1862_United_States_House_of_Representatives_elections_in_New_Jersey"));
+    }
+
+    use sortedvec::list_experiment::*;
+
+    sortedvec::sortedvec_slicekey! {
+        /// Sorted vector type that provides quick access to `T`s through `K`s.
+        #[derive(Debug, Clone)]
+        pub struct SortedVecSliceKey {
+            fn sort_key_slice(t: &String) -> &[u8] { t.as_bytes() }
+        }
+    }
+
+    #[bench]
+    fn find_wiki_article_slicekey(b: &mut test::Bencher) {
+        let sortedvec: SortedVecSliceKey = LIB.into_iter().map(|&x| x.to_owned()).collect();
+
+        b.iter(|| sortedvec.find("1862_United_States_House_of_Representatives_elections_in_New_Jersey"));
+    }
+
+    const TEST_STRING_A: &str = "1862_United_States_House_of_Representatives_elections_in_New_Jersey";
+    const TEST_STRING_B: &str = "1862_United_States_House_of_Representatives_elections_in_New_York";
+
+    #[bench]
+    fn simple_str_cmp(bench: &mut test::Bencher) {
+        bench.iter(|| TEST_STRING_A.cmp(TEST_STRING_B));
+    }
+
+    #[bench]
+    fn prefix_len_str_cmp(bench: &mut test::Bencher) {
+        bench.iter(|| simd_common_prefix_len(TEST_STRING_A.as_bytes(), TEST_STRING_B.as_bytes()));
+    }
+}

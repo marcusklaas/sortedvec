@@ -25,7 +25,6 @@
 //! let sorted_contains_six: Option<_> = sorted.find(&6);
 //! assert!(sorted_contains_six.is_none());
 //! ```
-//! 
 
 #![feature(specialization)]
 #![allow(dead_code)]
