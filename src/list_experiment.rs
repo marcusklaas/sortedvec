@@ -19,14 +19,15 @@ macro_rules! sortedvec_slicekey {
         }
 
         impl $name {
-            /// Finds and returns reference to element with given key, if it exists.
-            /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
-            pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
+            /// Internal method for lookups by key, returning the index where it is found
+            /// or where it should be inserted if it is not found.
+            #[inline]
+            fn try_find<E: AsRef<[$key]>>(&self, init_key: E) -> Result<usize, usize> {
                 let mut size = self.inner.len();
                 let mut upper_shared_prefix = 0;
                 let mut lower_shared_prefix = 0;
                 if size == 0 {
-                    return None;
+                    return Err(0);
                 }
                 let key_as_slice = init_key.as_ref();
                 let mut base = 0usize;
@@ -49,7 +50,7 @@ macro_rules! sortedvec_slicekey {
                             lower_shared_prefix = prefix_skip + prefix_len; 
                             mid
                         }
-                        Ordering::Equal => return Some(elt),
+                        Ordering::Equal => return Ok(mid),
                     };
                     size -= half;
                 }
@@ -58,36 +59,39 @@ macro_rules! sortedvec_slicekey {
                 let elt = unsafe { self.inner.get_unchecked(base) };
                 let key = &sort_key(&elt)[prefix_skip..];
                 let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
-                if cmp == Ordering::Equal { Some(elt) } else { None }
+                if cmp == Ordering::Equal { Ok(base) } else { Err(base) }
+            }
+
+            /// Finds and returns reference to element with given key, if it exists.
+            /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
+            pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
+                self.try_find(init_key).ok().map(|ix| unsafe { self.inner.get_unchecked(ix) })
             }
 
             /// Checks whether there is a value with that key in the collection. This is
             /// done in `O(log(n))` time.
             pub fn contains<E: AsRef<[$key]>>(&self, key: E) -> bool {
-                self.find(key).is_some()
+                self.try_find(key).is_ok()
             }
 
-            // /// Removes and returns a single value from the collection with the given key,
-            // /// if it exists. This operation has linear worst-case time complexity.
-            // pub fn remove(&mut self, key: &$key) -> Option<$val> {
-            //     self.inner
-            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
-            //         .ok()
-            //         .map(|idx| self.inner.remove(idx))
-            // }
+            /// Removes and returns a single value from the collection with the given key,
+            /// if it exists. This operation has linear worst-case time complexity.
+            pub fn remove<E: AsRef<[$key]>>(&mut self, key: E) -> Option<$val> {
+                self.try_find(key)
+                    .ok()
+                    .map(|idx| self.inner.remove(idx))
+            }
 
-            // /// Inserts a new value into the collection, maintaining the internal
-            // /// order invariant. This is an `O(n)` operation.
-            // pub fn insert(&mut self, val: $val) {
-            //     let ref key = $keyfn(&val);
-            //     let search = self
-            //         .inner
-            //         .binary_search_by(|probe| $keyfn(probe).cmp(key));
-            //     let idx = match search {
-            //         Ok(i) | Err(i) => i,
-            //     };
-            //     self.inner.insert(idx, val);
-            // }
+            /// Inserts a new value into the collection, maintaining the internal
+            /// order invariant. This is an `O(n)` operation.
+            pub fn insert(&mut self, val: $val) {
+                let ref key = $keyfn(&val);
+                let search = self.try_find(key);
+                let idx = match search {
+                    Ok(i) | Err(i) => i,
+                };
+                self.inner.insert(idx, val);
+            }
 
             /// Splits the collection into two at the given index.
             ///
