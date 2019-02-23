@@ -19,15 +19,6 @@ macro_rules! sortedvec_slicekey {
         }
 
         impl $name {
-            // /// Tries to find an element in the collection with the given key. It has
-            // /// logarithmic worst case time complexity.
-            // pub fn find(&self, key: &$key) -> Option<&$val> {
-            //     self.inner
-            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
-            //         .ok()
-            //         .and_then(|idx| self.inner.get(idx))
-            // }
-
             /// Finds and returns reference to element with given key, if it exists.
             /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
             pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
@@ -70,13 +61,11 @@ macro_rules! sortedvec_slicekey {
                 if cmp == Ordering::Equal { Some(elt) } else { None }
             }
 
-            // /// Checks whether there is a value with that key in the collection. This is
-            // /// done in `O(log(n))` time.
-            // pub fn contains(&self, key: &$key) -> bool {
-            //     self.inner
-            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
-            //         .is_ok()
-            // }
+            /// Checks whether there is a value with that key in the collection. This is
+            /// done in `O(log(n))` time.
+            pub fn contains<E: AsRef<[$key]>>(&self, key: E) -> bool {
+                self.find(key).is_some()
+            }
 
             // /// Removes and returns a single value from the collection with the given key,
             // /// if it exists. This operation has linear worst-case time complexity.
@@ -138,6 +127,28 @@ macro_rules! sortedvec_slicekey {
             }
         }
 
+        impl Into<Vec<$val>> for $name {
+            fn into(self) -> Vec<$val> {
+                self.inner
+            }
+        }
+
+        impl std::default::Default for $name {
+            fn default() -> Self {
+                Self { inner: std::default::Default::default() }
+            }
+        }
+
+        impl Extend<$val> for $name {
+            fn extend<I>(&mut self, iter: I)
+            where
+                I: IntoIterator<Item = $val>,
+            {
+                self.inner.extend(iter);
+                self.sort();
+            }
+        }
+
         impl std::iter::FromIterator<$val> for $name {
             fn from_iter<I: std::iter::IntoIterator<Item=$val>>(iter: I) -> Self {
                 let inner = Vec::from_iter(iter);
@@ -152,6 +163,32 @@ macro_rules! sortedvec_slicekey {
                 res
             }
         }
+
+        impl std::ops::Deref for $name {
+            type Target = Vec<$val>;
+
+            fn deref(&self) -> &Self::Target {
+                &self.inner
+            }
+        }
+
+        impl std::borrow::Borrow<[$val]> for $name {
+            fn borrow(&self) -> &[$val] {
+                &self.inner
+            }
+        }
+
+        impl AsRef<[$val]> for $name {
+            fn as_ref(&self) -> &[$val] {
+                &self.inner
+            }
+        }
+
+        impl AsRef<Vec<$val>> for $name {
+            fn as_ref(&self) -> &Vec<$val> {
+                &self.inner
+            }
+        }
     }
 }
 
@@ -162,70 +199,6 @@ sortedvec_slicekey! {
         fn sort_key(t: &String) -> &[u8] { t.as_bytes() }
     }
 }
-
-// pub struct SortedVecOfListLikes {
-//     inner: Vec<String>
-// }
-
-// fn sort_key(v: &String) -> &[u8] {
-//     v.as_bytes()
-// }
-
-// impl SortedVecOfListLikes
-// {
-//     pub fn new() -> Self {
-//         Self {
-//             inner: Vec::new()
-//         }
-//     }
-
-//     pub fn from_vec(mut inner: Vec<String>) -> Self {
-//         inner.sort_unstable_by(|a, b| sort_key(a).cmp(sort_key(b)));
-//         Self { inner }
-//     }
-
-//     /// Finds and returns reference to element with given key, if it exists.
-//     /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
-//     pub fn find<E: AsRef<[u8]>>(&self, init_key: E) -> Option<&String> {
-//         let mut size = self.inner.len();
-//         let mut upper_shared_prefix = 0;
-//         let mut lower_shared_prefix = 0;
-//         if size == 0 {
-//             return None;
-//         }
-//         let key_as_slice = init_key.as_ref();
-//         let mut base = 0usize;
-//         while size > 1 {
-//             let half = size / 2;
-//             let mid = base + half;
-//             let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
-//             // mid is always in [0, size), that means mid is >= 0 and < size.
-//             // mid >= 0: by definition
-//             // mid < size: mid = size / 2 + size / 4 + size / 8 ...
-//             let elt = unsafe { self.inner.get_unchecked(mid) };
-//             let key = sort_key(elt);
-//             let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
-//             base = match cmp {
-//                 Ordering::Greater => {
-//                     upper_shared_prefix = prefix_skip + prefix_len; 
-//                     base
-//                 }
-//                 Ordering::Less => {
-//                     lower_shared_prefix = prefix_skip + prefix_len; 
-//                     mid
-//                 }
-//                 Ordering::Equal => return Some(elt),
-//             };
-//             size -= half;
-//         }
-//         let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
-//         // base is always in [0, size) because base <= mid.
-//         let elt = unsafe { self.inner.get_unchecked(base) };
-//         let key = &sort_key(&elt)[prefix_skip..];
-//         let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
-//         if cmp == Ordering::Equal { Some(elt) } else { None }
-//     }
-// }
 
 // intermediate trait for specialization of slice's Ord.
 // comparisons additionally return the length of the longest common prefix
@@ -256,28 +229,24 @@ impl<A> SliceOrd<A> for [A]
     }
 }
 
-// we can specialize on [u8] using SIMD
+// Specialize on [u8] using SIMD
 impl SliceOrd<u8> for [u8] {
     #[inline]
     fn compare(&self, other: &[u8]) -> (usize, Ordering) {
-        compare_slices(self, other)
+        let shared_len = std::cmp::min(self.len(), other.len());
+        let shared_prefix_len = simd_common_prefix_len(self, other);
+
+        if shared_prefix_len < shared_len {
+            let cmp = self[shared_prefix_len].cmp(&other[shared_prefix_len]);
+            (shared_prefix_len, cmp)
+        } else {
+            let len_ord = self.len().cmp(&other.len());
+            (shared_prefix_len, len_ord)
+        }
     }
 }
 
-pub fn usize_common_prefix_len<T: 'static>(a: &[u8], b: &[u8]) -> usize
-    where &'static T: PartialEq {
-    let usize_width = std::mem::size_of::<T>();
-    let shared_len = std::cmp::min(a.len(), b.len());
-    let usize_len = shared_len / usize_width;
-
-    let a_usize: &[T] = unsafe { std::mem::transmute(a) };
-    let b_usize: &[T] = unsafe { std::mem::transmute(b) };
-
-    let prefix_len = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter()).take_while(|(a, b)| *a == b).count() * usize_width;
-    prefix_len + a[prefix_len..shared_len].iter().zip(b[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count()
-}
-
-pub fn usize_unsafe2_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+fn usize_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     let usize_width = std::mem::size_of::<usize>();
     let shared_len = std::cmp::min(a.len(), b.len());
     let a_usize: &[usize] = unsafe { std::mem::transmute(a) };
@@ -297,41 +266,7 @@ pub fn usize_unsafe2_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     shared_len
 }
 
-pub fn usize_unsafe_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-    let usize_width = std::mem::size_of::<usize>();
-    let shared_len = std::cmp::min(a.len(), b.len());
-    let usize_len = shared_len / usize_width;
-
-    let a_usize: &[usize] = unsafe { std::mem::transmute(a) };
-    let b_usize: &[usize] = unsafe { std::mem::transmute(b) };
-
-    let prefix_len = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter()).take_while(|(a, b)| a == b).count();
-    let total_len = prefix_len * usize_width;
-
-    if total_len < shared_len {
-        let xor = unsafe { a_usize.get_unchecked(prefix_len) ^ b_usize.get_unchecked(prefix_len) };
-        std::cmp::min(shared_len, prefix_len * usize_width + usize::to_le(xor.trailing_zeros() as usize) / 8)
-    } else {
-        total_len
-    }
-}
-
-pub fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-    let shared_len = std::cmp::min(a.len(), b.len());
-    a[..shared_len].iter().zip(b[..shared_len].iter()).take_while(|(a, b)| a == b).count()
-}
-
-pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-    let shared_len = std::cmp::min(a.len(), b.len());
-    let iter = (a[..shared_len].simd_iter(u8s(0)), b[..shared_len].simd_iter(u8s(0))).zip();
-    let width = iter.width();
-
-    let mut prefix_len = iter.simd_map(|(a, b)| a^b).take_while(|&x| x == Default::default()).count() * width;
-    prefix_len += a[prefix_len..shared_len].iter().zip(b[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count();
-    prefix_len
-}
-
-pub fn simd_alternative(a: &[u8], b: &[u8]) -> usize {
+fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     let shared_len = std::cmp::min(a.len(), b.len());
     let first_iter = a[..shared_len].simd_iter(u8s(0));
     let width = first_iter.width();
@@ -358,20 +293,7 @@ pub fn simd_alternative(a: &[u8], b: &[u8]) -> usize {
             prefix_len
         }
     } else {
-        usize_unsafe2_common_prefix_len(a, b)
-    }
-}
-
-fn compare_slices(a: &[u8], b: &[u8]) -> (usize, Ordering) {
-    let shared_len = std::cmp::min(a.len(), b.len());
-    let shared_prefix_len = simd_alternative(a, b);
-
-    if shared_prefix_len < shared_len {
-        let cmp = a[shared_prefix_len].cmp(&b[shared_prefix_len]);
-        (shared_prefix_len, cmp)
-    } else {
-        let len_ord = a.len().cmp(&b.len());
-        (shared_prefix_len, len_ord)
+        usize_common_prefix_len(a, b)
     }
 }
 
@@ -380,29 +302,34 @@ fn compare_slices(a: &[u8], b: &[u8]) -> (usize, Ordering) {
 mod tests {
     use super::*;
 
-    #[quickcheck]
-    fn simd_alternative_is_good(a: Vec<u8>, b: Vec<u8>) -> bool {
-        simd_alternative(&a, &b) == common_prefix_len(&a, &b)
+    // naive implementation of u8 slice compare for reference
+    fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+        let shared_len = std::cmp::min(a.len(), b.len());
+        a[..shared_len].iter().zip(b[..shared_len].iter()).take_while(|(a, b)| a == b).count()
     }
 
     #[quickcheck]
-    fn unsafe2_is_good(a: Vec<u8>, b: Vec<u8>) -> bool {
-        usize_unsafe2_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
+    fn simd_prefix_len(a: Vec<u8>, b: Vec<u8>) -> bool {
+        simd_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
     }
 
     #[quickcheck]
-    fn simd_alternative_with_prefix_is_good(a: Vec<u8>, b: Vec<u8>, mut c: Vec<u8>) -> bool {
+    fn usize_prefix_len(a: Vec<u8>, b: Vec<u8>) -> bool {
+        usize_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
+    }
+
+    #[quickcheck]
+    fn simd_prefix_len_with_prefix(a: Vec<u8>, b: Vec<u8>, mut c: Vec<u8>) -> bool {
         let mut a_extended = c.clone();
         a_extended.extend(a);
-
         c.extend(b);
 
-        simd_alternative(&a_extended, &c) == common_prefix_len(&a_extended, &c)
+        simd_common_prefix_len(&a_extended, &c) == common_prefix_len(&a_extended, &c)
     }
 
     #[quickcheck]
     fn compare_slices_works(a: Vec<u8>, b: Vec<u8>) -> bool {
-        compare_slices(&a, &b).1 == a.cmp(&b)
+        a.compare(&b).1 == a.cmp(&b)
     }
 
     #[quickcheck]
