@@ -96,7 +96,15 @@ mod int_bench {
 
     use sortedvec::list_experiment::*;
 
-    const SHARED_LEN: usize = 150;
+    const SHARED_LEN: usize = 315;
+
+    #[bench]
+    fn common_prefix_usize_unsafe2(b: &mut test::Bencher) {
+        let a: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(5u8)).collect();
+        let c: Vec<u8> = ::std::iter::repeat(127u8).take(SHARED_LEN).chain(Some(4u8)).collect();
+        
+        b.iter(|| assert_eq!(SHARED_LEN, usize_unsafe2_common_prefix_len(&a, &c)));
+    }
 
     #[bench]
     fn common_prefix_usize_unsafe(b: &mut test::Bencher) {

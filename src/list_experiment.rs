@@ -1,69 +1,231 @@
 use std::cmp::Ordering;
 use faster::*;
 
-pub struct SortedVecOfListLikes {
-    inner: Vec<String>
-}
-
-fn sort_key(v: &String) -> &[u8] {
-    v.as_bytes()
-}
-
-impl SortedVecOfListLikes
-{
-    pub fn new() -> Self {
-        Self {
-            inner: Vec::new()
-        }
+#[macro_export]
+macro_rules! sortedvec_slicekey {
+(
+    $(#[$attr:meta])*
+    $v:vis struct $name:ident {
+        fn $keyfn:ident ($i:ident : & $val:ty) -> & [ $key:ty ] {
+            $keyexpr:expr
+        } $(,)?
     }
+) => {
+        fn $keyfn ($i : &$val) -> & [ $key ] { $keyexpr }
 
-    pub fn from_vec(mut inner: Vec<String>) -> Self {
-        inner.sort_unstable_by(|a, b| sort_key(a).cmp(sort_key(b)));
-        Self { inner }
-    }
-
-    /// Finds and returns reference to element with given key, if it exists.
-    /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
-    pub fn find<E: AsRef<[u8]>>(&self, init_key: E) -> Option<&String> {
-        let mut size = self.inner.len();
-        let mut upper_shared_prefix = 0;
-        let mut lower_shared_prefix = 0;
-        if size == 0 {
-            return None;
+        $(#[$attr])*
+        $v struct $name {
+            inner: Vec<$val>,
         }
-        let key_as_slice = init_key.as_ref();
-        let mut base = 0usize;
-        while size > 1 {
-            let half = size / 2;
-            let mid = base + half;
-            let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
-            // mid is always in [0, size), that means mid is >= 0 and < size.
-            // mid >= 0: by definition
-            // mid < size: mid = size / 2 + size / 4 + size / 8 ...
-            let elt = unsafe { self.inner.get_unchecked(mid) };
-            let key = sort_key(elt);
-            let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
-            base = match cmp {
-                Ordering::Greater => {
-                    upper_shared_prefix = prefix_skip + prefix_len; 
-                    base
+
+        impl $name {
+            // /// Tries to find an element in the collection with the given key. It has
+            // /// logarithmic worst case time complexity.
+            // pub fn find(&self, key: &$key) -> Option<&$val> {
+            //     self.inner
+            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
+            //         .ok()
+            //         .and_then(|idx| self.inner.get(idx))
+            // }
+
+            /// Finds and returns reference to element with given key, if it exists.
+            /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
+            pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
+                let mut size = self.inner.len();
+                let mut upper_shared_prefix = 0;
+                let mut lower_shared_prefix = 0;
+                if size == 0 {
+                    return None;
                 }
-                Ordering::Less => {
-                    lower_shared_prefix = prefix_skip + prefix_len; 
-                    mid
+                let key_as_slice = init_key.as_ref();
+                let mut base = 0usize;
+                while size > 1 {
+                    let half = size / 2;
+                    let mid = base + half;
+                    let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
+                    // mid is always in [0, size), that means mid is >= 0 and < size.
+                    // mid >= 0: by definition
+                    // mid < size: mid = size / 2 + size / 4 + size / 8 ...
+                    let elt = unsafe { self.inner.get_unchecked(mid) };
+                    let key = sort_key(elt);
+                    let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
+                    base = match cmp {
+                        Ordering::Greater => {
+                            upper_shared_prefix = prefix_skip + prefix_len; 
+                            base
+                        }
+                        Ordering::Less => {
+                            lower_shared_prefix = prefix_skip + prefix_len; 
+                            mid
+                        }
+                        Ordering::Equal => return Some(elt),
+                    };
+                    size -= half;
                 }
-                Ordering::Equal => return Some(elt),
-            };
-            size -= half;
+                let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
+                // base is always in [0, size) because base <= mid.
+                let elt = unsafe { self.inner.get_unchecked(base) };
+                let key = &sort_key(&elt)[prefix_skip..];
+                let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
+                if cmp == Ordering::Equal { Some(elt) } else { None }
+            }
+
+            // /// Checks whether there is a value with that key in the collection. This is
+            // /// done in `O(log(n))` time.
+            // pub fn contains(&self, key: &$key) -> bool {
+            //     self.inner
+            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
+            //         .is_ok()
+            // }
+
+            // /// Removes and returns a single value from the collection with the given key,
+            // /// if it exists. This operation has linear worst-case time complexity.
+            // pub fn remove(&mut self, key: &$key) -> Option<$val> {
+            //     self.inner
+            //         .binary_search_by(|probe| $keyfn(probe).cmp(key))
+            //         .ok()
+            //         .map(|idx| self.inner.remove(idx))
+            // }
+
+            // /// Inserts a new value into the collection, maintaining the internal
+            // /// order invariant. This is an `O(n)` operation.
+            // pub fn insert(&mut self, val: $val) {
+            //     let ref key = $keyfn(&val);
+            //     let search = self
+            //         .inner
+            //         .binary_search_by(|probe| $keyfn(probe).cmp(key));
+            //     let idx = match search {
+            //         Ok(i) | Err(i) => i,
+            //     };
+            //     self.inner.insert(idx, val);
+            // }
+
+            /// Splits the collection into two at the given index.
+            ///
+            /// Returns a newly allocated `Self`. `self` contains elements `[0, at)`,
+            /// and the returned `Self` contains elements `[at, len)`.
+            ///
+            /// Note that the capacity of `self` does not change.
+            ///
+            /// # Panics
+            ///
+            /// Panics if `at > len`.
+            pub fn split_off(&mut self, at: usize) -> Self {
+                let other_inner = self.inner.split_off(at);
+                Self {
+                    inner: other_inner,
+                }
+            }
+
+            /// Removes all elements but one that resolve to the same key.
+            pub fn dedup(&mut self) {
+                self.inner.dedup_by(|a, b| $keyfn(a) == $keyfn(b));
+            }
+
+            /// Removes and returns the greatest element with the respect to
+            /// the generated keys. An `O(1)` operation.
+            pub fn pop(&mut self) -> Option<$val> {
+                self.inner.pop()
+            }
+
+            // private method
+            fn sort(&mut self) {
+                self.inner.sort_unstable_by(|a, b| {
+                    let lhs = $keyfn(a);
+                    let rhs = $keyfn(b);
+                    lhs.cmp(&rhs)
+                })
+            }
         }
-        let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
-        // base is always in [0, size) because base <= mid.
-        let elt = unsafe { self.inner.get_unchecked(base) };
-        let key = &sort_key(&elt)[prefix_skip..];
-        let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
-        if cmp == Ordering::Equal { Some(elt) } else { None }
+
+        impl std::iter::FromIterator<$val> for $name {
+            fn from_iter<I: std::iter::IntoIterator<Item=$val>>(iter: I) -> Self {
+                let inner = Vec::from_iter(iter);
+                From::from(inner)
+            }
+        }
+
+        impl From<Vec<$val>> for $name {
+            fn from(vec: Vec<$val>) -> Self {
+                let mut res = Self { inner: vec };
+                res.sort();
+                res
+            }
+        }
     }
 }
+
+sortedvec_slicekey! {
+    /// Sorted vector type that provides quick access to `T`s through `K`s.
+    #[derive(Debug, Clone)]
+    pub struct SortedVecOfListLikes {
+        fn sort_key(t: &String) -> &[u8] { t.as_bytes() }
+    }
+}
+
+// pub struct SortedVecOfListLikes {
+//     inner: Vec<String>
+// }
+
+// fn sort_key(v: &String) -> &[u8] {
+//     v.as_bytes()
+// }
+
+// impl SortedVecOfListLikes
+// {
+//     pub fn new() -> Self {
+//         Self {
+//             inner: Vec::new()
+//         }
+//     }
+
+//     pub fn from_vec(mut inner: Vec<String>) -> Self {
+//         inner.sort_unstable_by(|a, b| sort_key(a).cmp(sort_key(b)));
+//         Self { inner }
+//     }
+
+//     /// Finds and returns reference to element with given key, if it exists.
+//     /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
+//     pub fn find<E: AsRef<[u8]>>(&self, init_key: E) -> Option<&String> {
+//         let mut size = self.inner.len();
+//         let mut upper_shared_prefix = 0;
+//         let mut lower_shared_prefix = 0;
+//         if size == 0 {
+//             return None;
+//         }
+//         let key_as_slice = init_key.as_ref();
+//         let mut base = 0usize;
+//         while size > 1 {
+//             let half = size / 2;
+//             let mid = base + half;
+//             let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
+//             // mid is always in [0, size), that means mid is >= 0 and < size.
+//             // mid >= 0: by definition
+//             // mid < size: mid = size / 2 + size / 4 + size / 8 ...
+//             let elt = unsafe { self.inner.get_unchecked(mid) };
+//             let key = sort_key(elt);
+//             let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
+//             base = match cmp {
+//                 Ordering::Greater => {
+//                     upper_shared_prefix = prefix_skip + prefix_len; 
+//                     base
+//                 }
+//                 Ordering::Less => {
+//                     lower_shared_prefix = prefix_skip + prefix_len; 
+//                     mid
+//                 }
+//                 Ordering::Equal => return Some(elt),
+//             };
+//             size -= half;
+//         }
+//         let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
+//         // base is always in [0, size) because base <= mid.
+//         let elt = unsafe { self.inner.get_unchecked(base) };
+//         let key = &sort_key(&elt)[prefix_skip..];
+//         let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
+//         if cmp == Ordering::Equal { Some(elt) } else { None }
+//     }
+// }
 
 // intermediate trait for specialization of slice's Ord.
 // comparisons additionally return the length of the longest common prefix
@@ -113,6 +275,26 @@ pub fn usize_common_prefix_len<T: 'static>(a: &[u8], b: &[u8]) -> usize
 
     let prefix_len = a_usize[..usize_len].iter().zip(b_usize[..usize_len].iter()).take_while(|(a, b)| *a == b).count() * usize_width;
     prefix_len + a[prefix_len..shared_len].iter().zip(b[prefix_len..shared_len].iter()).take_while(|(a, b)| a == b).count()
+}
+
+pub fn usize_unsafe2_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+    let usize_width = std::mem::size_of::<usize>();
+    let shared_len = std::cmp::min(a.len(), b.len());
+    let a_usize: &[usize] = unsafe { std::mem::transmute(a) };
+    let b_usize: &[usize] = unsafe { std::mem::transmute(b) };
+    let mut i = 0;
+
+    while i < shared_len {
+        let a_elt = unsafe { a_usize.get_unchecked(i / usize_width) };
+        let b_elt = unsafe { b_usize.get_unchecked(i / usize_width) };
+        let xor = a_elt ^ b_elt;
+        if xor > 0 {
+            return std::cmp::min(shared_len, i + usize::to_le(xor.trailing_zeros() as usize) / 8);
+        }
+        i += usize_width;
+    }
+
+    shared_len
 }
 
 pub fn usize_unsafe_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
@@ -176,7 +358,7 @@ pub fn simd_alternative(a: &[u8], b: &[u8]) -> usize {
             prefix_len
         }
     } else {
-        usize_common_prefix_len::<u32>(a, b)
+        usize_unsafe2_common_prefix_len(a, b)
     }
 }
 
@@ -204,6 +386,11 @@ mod tests {
     }
 
     #[quickcheck]
+    fn unsafe2_is_good(a: Vec<u8>, b: Vec<u8>) -> bool {
+        usize_unsafe2_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
+    }
+
+    #[quickcheck]
     fn simd_alternative_with_prefix_is_good(a: Vec<u8>, b: Vec<u8>, mut c: Vec<u8>) -> bool {
         let mut a_extended = c.clone();
         a_extended.extend(a);
@@ -222,21 +409,21 @@ mod tests {
     fn string_in_vec(mut xs: Vec<String>, s: String) -> bool {
         let s_clone = s.clone();
         xs.insert(xs.len() / 2, s_clone);
-        let sorted = SortedVecOfListLikes::from_vec(xs);
+        let sorted = SortedVecOfListLikes::from(xs);
 
         sorted.find(s.as_bytes()).is_some()
     }
 
     #[quickcheck]
     fn strings_in_vec(xs: Vec<String>) -> bool {
-        let sorted = SortedVecOfListLikes::from_vec(xs.clone());
+        let sorted = SortedVecOfListLikes::from(xs.clone());
 
         xs.into_iter().all(|s| sorted.find(s.as_bytes()).unwrap() == &s)
     }
 
     #[quickcheck]
     fn in_sorted_iff_in_source(xs: Vec<String>, s: String) -> bool {
-        let sorted = SortedVecOfListLikes::from_vec(xs.clone());
+        let sorted = SortedVecOfListLikes::from(xs.clone());
 
         sorted.find(&s).is_some() == xs.into_iter().any(|x| x == s)
     }
@@ -247,7 +434,7 @@ mod tests {
             "\u{80}", "\u{80}", "\u{80}", "\u{80}", "", "\u{80}", "", "", "¤", "", "", "\u{80}",
             "", "\u{80}", "", "\u{80}", "", "¤\u{0}", "¥", "", "", "¥", "", "\u{80}", "", "", "¥", "\u{80}", ""
         ];
-        let sorted = SortedVecOfListLikes::from_vec(case.into_iter().map(|&x| x.to_owned()).collect());
+        let sorted: SortedVecOfListLikes = case.into_iter().map(|&x| x.to_owned()).collect();
 
         for s in case {
             assert_eq!(s, sorted.find(s.as_bytes()).unwrap());
