@@ -337,3 +337,40 @@ mod slicekey_bench {
         bench.iter(|| simd_common_prefix_len(TEST_STRING_A.as_bytes(), TEST_STRING_B.as_bytes()));
     }
 }
+
+#[cfg(test)]
+mod dna_primers {
+    use rand::prelude::*;
+
+    enum Nucleobase {
+        Adenine,
+        Cytosine,
+        Guanine,
+        Thymine,
+    }
+
+    impl Nucleobase {
+        fn from_u8(x: u8) -> Self {
+            match x {
+                0...1 => Nucleobase::Adenine,
+                2...3 => Nucleobase::Cytosine,
+                4...5 => Nucleobase::Guanine,
+                _     => Nucleobase::Thymine,
+            }
+        }
+    }
+
+    struct Primer {
+        length: u8,
+        sequence: [Nucleobase; 32],
+    }
+
+    const SAMPLE_SIZE: usize = 20_000_000;
+
+    #[bench]
+    fn find_primer_naive(b: &mut test::Bencher) {
+        // create primer set
+        let seed = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
+        let mut rng = SmallRng::from_seed(seed);
+    }
+}
