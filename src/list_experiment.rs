@@ -10,7 +10,7 @@ macro_rules! sortedvec_slicekey {
         } $(,)?
     }
 ) => {
-        // use $crate::list_experiment::SliceOrd;
+        use $crate::list_experiment::SliceOrd as _;
 
         fn $keyfn ($i : &$val) -> & [ $key ] { $keyexpr }
 
@@ -229,7 +229,6 @@ impl<A> SliceOrd<A> for [A]
 
 // Specialize on [u8] using SIMD
 impl SliceOrd<u8> for [u8] {
-    #[inline(always)]
     fn compare(&self, other: &[u8]) -> (usize, std::cmp::Ordering) {
         let shared_len = std::cmp::min(self.len(), other.len());
         let shared_prefix_len = simd_common_prefix_len(self, other);

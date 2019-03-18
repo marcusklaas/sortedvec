@@ -342,7 +342,6 @@ mod slicekey_bench {
 mod dna_primers {
     use rand::prelude::*;
     use std::cmp::Ordering;
-    use sortedvec::list_experiment::SliceOrd;
     
     #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
     enum Nucleobase {
@@ -369,6 +368,14 @@ mod dna_primers {
         sequence: [Nucleobase; 32],
     }
 
+    impl Primer {
+        fn as_bytes(&self) -> &[u8] {
+            unsafe {
+                std::mem::transmute(&self.sequence[..(self.length as usize)])
+            }
+        }
+    }
+
     impl PartialEq<Primer> for Primer {
         fn eq(&self, other: &Primer) -> bool {
             &self.sequence[..(self.length as usize)] == &other.sequence[..(other.length as usize)]
@@ -385,7 +392,7 @@ mod dna_primers {
 
     impl Distribution<Primer> for CustomDist {
         fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Primer {
-            let length = 18 + rng.gen::<u8>() % 4;
+            let length = 22 + rng.gen::<u8>() % 4;
             let mut sequence = [Nucleobase::Adenine; 32];
             let mut prev = Nucleobase::Adenine;
 
@@ -449,6 +456,8 @@ mod dna_primers {
         }
     }
 
+    // TODO: implement AsRef<[Nucleobase]> and AsRef<[u8]> for Primers
+
     #[bench]
     fn find_primer_list_sortedvec(b: &mut test::Bencher) {
         // create primer set
@@ -459,6 +468,26 @@ mod dna_primers {
 
         b.iter(|| {
             dataset.find(&test_val.sequence[..(test_val.length as usize)]);
+        });
+    }
+
+    sortedvec::sortedvec_slicekey! {
+        struct SortedByteSlicePrimerVec {
+            fn key_deriv_three(x: &Primer) -> &[u8] { x.as_bytes() }
+        }
+    }
+
+    #[bench]
+    fn find_primer_list_as_bytes(b: &mut test::Bencher) {
+        let seed = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
+        let mut rng = SmallRng::from_seed(seed);
+        let dataset: SortedByteSlicePrimerVec = rng.sample_iter(&CustomDist).take(SAMPLE_SIZE).collect();
+        let test_val = dataset[SAMPLE_SIZE/ 2 - 1];
+
+        assert!(std::mem::size_of::<Nucleobase>() == 1);
+
+        b.iter(|| {
+            dataset.find(test_val.as_bytes());
         });
     }
 }
