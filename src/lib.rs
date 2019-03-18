@@ -37,7 +37,6 @@ extern crate quickcheck_macros;
 
 /// Example of a collection defined using the `sortedvec` macro.
 pub mod example;
-
 pub mod list_experiment;
 
 /// A macro that defines a sorted vector data collection.

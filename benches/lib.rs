@@ -342,6 +342,7 @@ mod slicekey_bench {
 mod dna_primers {
     use rand::prelude::*;
     use std::cmp::Ordering;
+    use sortedvec::list_experiment::SliceOrd;
     
     #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
     enum Nucleobase {
@@ -441,4 +442,24 @@ mod dna_primers {
             dataset.find(&&test_val);
         });
     }
+
+    sortedvec::sortedvec_slicekey! {
+        struct SortedSlicePrimerVec {
+            fn key_deriv_two(x: &Primer) -> &[Nucleobase] { &x.sequence[..(x.length as usize)] }
+        }
+    }
+
+    #[bench]
+    fn find_primer_list_sortedvec(b: &mut test::Bencher) {
+        // create primer set
+        let seed = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
+        let mut rng = SmallRng::from_seed(seed);
+        let dataset: SortedSlicePrimerVec = rng.sample_iter(&CustomDist).take(SAMPLE_SIZE).collect();
+        let test_val = dataset[SAMPLE_SIZE/ 2 - 1];
+
+        b.iter(|| {
+            dataset.find(&test_val.sequence[..(test_val.length as usize)]);
+        });
+    }
 }
+
