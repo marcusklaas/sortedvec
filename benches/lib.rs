@@ -341,7 +341,9 @@ mod slicekey_bench {
 #[cfg(test)]
 mod dna_primers {
     use rand::prelude::*;
-
+    use std::cmp::Ordering;
+    
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
     enum Nucleobase {
         Adenine,
         Cytosine,
@@ -360,17 +362,83 @@ mod dna_primers {
         }
     }
 
+    #[derive(Copy, Clone, Debug, Ord, Eq)]
     struct Primer {
         length: u8,
         sequence: [Nucleobase; 32],
     }
 
+    impl PartialEq<Primer> for Primer {
+        fn eq(&self, other: &Primer) -> bool {
+            &self.sequence[..(self.length as usize)] == &other.sequence[..(other.length as usize)]
+        }
+    }
+
+    impl PartialOrd for Primer {
+        fn partial_cmp(&self, other: &Primer) -> Option<Ordering> {
+            Some(self.sequence[..(self.length as usize)].cmp(&other.sequence[..(other.length as usize)]))
+        }
+    }
+
+    struct CustomDist;
+
+    impl Distribution<Primer> for CustomDist {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Primer {
+            let length = 18 + rng.gen::<u8>() % 4;
+            let mut sequence = [Nucleobase::Adenine; 32];
+            let mut prev = Nucleobase::Adenine;
+
+            for i in 0..length {
+                let next = match (prev, rng.gen::<u8>()) {
+                    (Nucleobase::Adenine, 0  ..=128) => Nucleobase::Adenine,
+                    (Nucleobase::Adenine, 129..=170) => Nucleobase::Cytosine,
+                    (Nucleobase::Adenine, 171..=240) => Nucleobase::Guanine,
+                    (Nucleobase::Adenine, 141..=255) => Nucleobase::Thymine,
+
+                    (Nucleobase::Cytosine, 0  ..=80)  => Nucleobase::Adenine,
+                    (Nucleobase::Cytosine, 80 ..=100) => Nucleobase::Cytosine,
+                    (Nucleobase::Cytosine, 101..=200) => Nucleobase::Guanine,
+                    (Nucleobase::Cytosine, 201..=255) => Nucleobase::Thymine,
+
+                    (Nucleobase::Guanine, 0  ..=60)  => Nucleobase::Adenine,
+                    (Nucleobase::Guanine, 61 ..=80)  => Nucleobase::Cytosine,
+                    (Nucleobase::Guanine, 81 ..=180) => Nucleobase::Guanine,
+                    (Nucleobase::Guanine, 181..=255) => Nucleobase::Thymine,
+
+                    (Nucleobase::Thymine, 0  ..=30)  => Nucleobase::Adenine,
+                    (Nucleobase::Thymine, 31 ..=120) => Nucleobase::Cytosine,
+                    (Nucleobase::Thymine, 121..=254) => Nucleobase::Guanine,
+                    (Nucleobase::Thymine, 255..=255) => Nucleobase::Thymine,
+                };
+                sequence[i as usize] = next;
+                prev = next;
+            }
+
+            Primer {
+                length,
+                sequence,
+            }
+        }
+    }
+
     const SAMPLE_SIZE: usize = 20_000_000;
 
+    sortedvec::sortedvec! {
+        struct SortedPrimerVec {
+            fn key_deriv(x: &Primer) -> &Primer { x }
+        }
+    }
+
     #[bench]
-    fn find_primer_naive(b: &mut test::Bencher) {
+    fn find_primer_naive_sortedvec(b: &mut test::Bencher) {
         // create primer set
         let seed = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
         let mut rng = SmallRng::from_seed(seed);
+        let dataset: SortedPrimerVec = rng.sample_iter(&CustomDist).take(SAMPLE_SIZE).collect();
+        let test_val = dataset[SAMPLE_SIZE/ 2 - 1];
+
+        b.iter(|| {
+            dataset.find(&&test_val);
+        });
     }
 }
