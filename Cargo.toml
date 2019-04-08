@@ -1,6 +1,6 @@
 [package]
 name = "sortedvec"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
 edition = "2018"
 description = "a sorted vector that enables quick lookups"
@@ -8,12 +8,6 @@ license = "Apache-2.0"
 repository = "https://github.com/marcusklaas/sortedvec"
 keywords = [ "sortedvec", "lookup", "table", "datastructure", "vec" ]
 readme = "readme.md"
-
-[profile.release]
-debug = true
-
-[dependencies]
-faster = { git = "https://github.com/AdamNiederer/faster" }
 
 [dev-dependencies]
 quickcheck = "0.8"
