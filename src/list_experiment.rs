@@ -41,7 +41,9 @@ macro_rules! sortedvec_slicekey {
                     // mid < size: mid = size / 2 + size / 4 + size / 8 ...
                     let elt = unsafe { self.inner.get_unchecked(mid) };
                     let key = $keyfn(elt);
-                    let (prefix_len, cmp) = key[prefix_skip..].compare(&key_as_slice[prefix_skip..]);
+                    let (prefix_len, cmp) = unsafe { 
+                        key.get_unchecked(prefix_skip..).compare(key_as_slice.get_unchecked(prefix_skip..))
+                    };
                     base = match cmp {
                         std::cmp::Ordering::Greater => {
                             upper_shared_prefix = prefix_skip + prefix_len; 
@@ -58,8 +60,8 @@ macro_rules! sortedvec_slicekey {
                 let prefix_skip = std::cmp::min(lower_shared_prefix, upper_shared_prefix);
                 // base is always in [0, size) because base <= mid.
                 let elt = unsafe { self.inner.get_unchecked(base) };
-                let key = &$keyfn(&elt)[prefix_skip..];
-                let (_prefix, cmp) = key.compare(&key_as_slice[prefix_skip..]);
+                let key = unsafe { &$keyfn(&elt).get_unchecked(prefix_skip..) };
+                let (_prefix, cmp) = unsafe { key.compare(key_as_slice.get_unchecked(prefix_skip..)) };
                 if cmp == std::cmp::Ordering::Equal { Ok(base) } else { Err(base) }
             }
 
@@ -207,6 +209,7 @@ pub trait SliceOrd<B> {
 impl<A> SliceOrd<A> for [A]
     where A: Ord
 {
+    #[inline]
     default fn compare(&self, other: &[A]) -> (usize, std::cmp::Ordering) {
         let l = std::cmp::min(self.len(), other.len());
         let mut prefix_len = 0;
@@ -229,30 +232,70 @@ impl<A> SliceOrd<A> for [A]
 
 // Specialize on [u8] using SIMD
 impl SliceOrd<u8> for [u8] {
+    #[inline]
     fn compare(&self, other: &[u8]) -> (usize, std::cmp::Ordering) {
         let shared_len = std::cmp::min(self.len(), other.len());
-        let shared_prefix_len = simd_common_prefix_len(self, other);
+        // let shared_prefix_len = unsafe {
+        //     usize_common_prefix_len(self, other, shared_len)
+        // };
 
-        if shared_prefix_len < shared_len {
-            let cmp = self[shared_prefix_len].cmp(&other[shared_prefix_len]);
-            (shared_prefix_len, cmp)
-        } else {
-            let len_ord = self.len().cmp(&other.len());
-            (shared_prefix_len, len_ord)
-        }
+        // if shared_prefix_len < shared_len {
+        //     let cmp = self[shared_prefix_len].cmp(&other[shared_prefix_len]);
+        //     (shared_prefix_len, cmp)
+        // } else {
+        //     let len_ord = self.len().cmp(&other.len());
+        //     (shared_prefix_len, len_ord)
+        // }
+        unsafe { usize_compare(self, other, shared_len) }
     }
 }
 
-fn usize_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+#[inline]
+unsafe fn usize_compare(a: &[u8], b: &[u8], shared_len: usize) -> (usize, std::cmp::Ordering) {
     let usize_width = std::mem::size_of::<usize>();
-    let shared_len = std::cmp::min(a.len(), b.len());
-    let a_usize: &[usize] = unsafe { std::mem::transmute(a) };
-    let b_usize: &[usize] = unsafe { std::mem::transmute(b) };
+    let mut i = 0;
+
+    // while i < shared_len {
+    //     let a_elt: usize = (a.as_ptr().add(i) as *const usize).read();
+    //     let b_elt: usize = (b.as_ptr().add(i) as *const usize).read();
+    //     let xor = a_elt ^ b_elt;
+    //     if xor > 0 {
+    //         return std::cmp::min(shared_len, i + usize::to_le(xor.trailing_zeros() as usize) / 8);
+    //     }
+    //     i += usize_width;
+    // }
+
+    // shared_len
+    // 
+    while i < shared_len {
+        let a_elt: usize = (a.as_ptr().add(i) as *const usize).read().swap_bytes();
+        let b_elt: usize = (b.as_ptr().add(i) as *const usize).read().swap_bytes();
+        match a_elt.cmp(&b_elt) {
+            std::cmp::Ordering::Equal => { i += usize_width; }
+            non_eq => {
+                let xor = a_elt ^ b_elt;
+                let prefix_len = i + xor.leading_zeros() as usize / 8;
+                return if shared_len <= prefix_len {
+                    (shared_len, a.len().cmp(&b.len()))
+                } else {
+                    (prefix_len, non_eq)
+                };
+            }
+        }
+    }
+
+    (shared_len, a.len().cmp(&b.len()))
+}
+
+
+#[inline]
+unsafe fn usize_common_prefix_len(a: &[u8], b: &[u8], shared_len: usize) -> usize {
+    let usize_width = std::mem::size_of::<usize>();
     let mut i = 0;
 
     while i < shared_len {
-        let a_elt = unsafe { a_usize.get_unchecked(i / usize_width) };
-        let b_elt = unsafe { b_usize.get_unchecked(i / usize_width) };
+        let a_elt: usize = (a.as_ptr().add(i) as *const usize).read();
+        let b_elt: usize = (b.as_ptr().add(i) as *const usize).read();
         let xor = a_elt ^ b_elt;
         if xor > 0 {
             return std::cmp::min(shared_len, i + usize::to_le(xor.trailing_zeros() as usize) / 8);
@@ -263,8 +306,8 @@ fn usize_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
     shared_len
 }
 
-pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-    let shared_len = std::cmp::min(a.len(), b.len());
+#[inline]
+pub unsafe fn simd_common_prefix_len(a: &[u8], b: &[u8], shared_len: usize) -> usize {
     let first_iter = a[..shared_len].simd_iter(u8s(0));
     let width = first_iter.width();
 
@@ -278,11 +321,7 @@ pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
 
         if prefix_len < shared_len {
             let ix = std::cmp::min(shared_len - width, prefix_len);
-            let compared = unsafe {
-                let a_loaded = a.load_unchecked(ix);
-                let b_loaded = b.load_unchecked(ix);
-                a_loaded.eq(b_loaded)
-            };
+            let compared = a.load_unchecked(ix).eq(b.load_unchecked(ix));
             let bitmask = !compared.bitmask();
 
             ix + bitmask.trailing_zeros() as usize
@@ -290,7 +329,7 @@ pub fn simd_common_prefix_len(a: &[u8], b: &[u8]) -> usize {
             prefix_len
         }
     } else {
-        usize_common_prefix_len(a, b)
+        usize_common_prefix_len(a, b, shared_len)
     }
 }
 
@@ -314,12 +353,18 @@ mod tests {
 
     #[quickcheck]
     fn simd_prefix_len(a: Vec<u8>, b: Vec<u8>) -> bool {
-        simd_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
+        let shared_len = std::cmp::min(a.len(), b.len());
+        unsafe {
+            simd_common_prefix_len(&a, &b, shared_len) == common_prefix_len(&a, &b)
+        }
     }
 
     #[quickcheck]
     fn usize_prefix_len(a: Vec<u8>, b: Vec<u8>) -> bool {
-        usize_common_prefix_len(&a, &b) == common_prefix_len(&a, &b)
+        let shared_len = std::cmp::min(a.len(), b.len());
+        unsafe {
+            usize_common_prefix_len(&a, &b, shared_len) == common_prefix_len(&a, &b)
+        }
     }
 
     #[quickcheck]
@@ -327,8 +372,11 @@ mod tests {
         let mut a_extended = c.clone();
         a_extended.extend(a);
         c.extend(b);
+        let shared_len = std::cmp::min(a_extended.len(), c.len());
 
-        simd_common_prefix_len(&a_extended, &c) == common_prefix_len(&a_extended, &c)
+        unsafe {
+            simd_common_prefix_len(&a_extended, &c, shared_len) == common_prefix_len(&a_extended, &c)
+        }
     }
 
     #[quickcheck]

@@ -9,6 +9,9 @@ repository = "https://github.com/marcusklaas/sortedvec"
 keywords = [ "sortedvec", "lookup", "table", "datastructure", "vec" ]
 readme = "readme.md"
 
+[profile.release]
+debug = true
+
 [dependencies]
 faster = { git = "https://github.com/AdamNiederer/faster" }
 

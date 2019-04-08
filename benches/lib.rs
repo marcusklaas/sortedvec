@@ -98,7 +98,8 @@ mod int_bench {
 
 #[cfg(test)]
 mod slicekey_bench {
-    static LIB: &[&str] = &[
+    static LIB: &[&str] = {
+        &[
         "1862_Chicago_mayoral_election",
         "1862_City_of_Auckland_West_by-election",
         "1862_City_of_Dunedin_by-election",
@@ -290,10 +291,10 @@ mod slicekey_bench {
         "1863_United_States_Senate_special_election_in_Indiana",
         "1863_United_States_Senate_special_election_in_Missouri",
         "1863_United_States_Senate_special_election_in_New_Jersey",
-    ];
+        ]
+    };
 
     sortedvec::sortedvec! {
-        /// Sorted vector type that provides quick access to `T`s through `K`s.
         #[derive(Debug, Clone)]
         pub struct SortedVec {
             fn sort_key(t: &String) -> &str { &t[..] }
@@ -310,7 +311,6 @@ mod slicekey_bench {
     use sortedvec::list_experiment::*;
 
     sortedvec::sortedvec_slicekey! {
-        /// Sorted vector type that provides quick access to `T`s through `K`s.
         #[derive(Debug, Clone)]
         pub struct SortedVecSliceKey {
             fn sort_key_slice(t: &String) -> &[u8] { t.as_bytes() }
@@ -334,7 +334,10 @@ mod slicekey_bench {
 
     #[bench]
     fn prefix_len_str_cmp(bench: &mut test::Bencher) {
-        bench.iter(|| simd_common_prefix_len(TEST_STRING_A.as_bytes(), TEST_STRING_B.as_bytes()));
+        let shared_len = std::cmp::min(TEST_STRING_A.len(), TEST_STRING_B.len());
+        bench.iter(|| unsafe {
+            simd_common_prefix_len(TEST_STRING_A.as_bytes(), TEST_STRING_B.as_bytes(), shared_len)
+        });
     }
 }
 
