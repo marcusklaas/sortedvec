@@ -94,8 +94,3 @@ mod int_bench {
         s1000;1000u32
     );
 }
-
-#[cfg(test)]
-mod dna_primers {
-    
-}

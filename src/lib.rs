@@ -1,6 +1,6 @@
 //! This crate exposes macros that generate data structures
 //! on `Ord` keys that provide faster lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
-//! and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
+//! and is simpler and more memory efficient than hashmaps. It is ideal for small
 //! lookup tables where insertions and deletions are infrequent.
 
 //!

@@ -1,8 +1,8 @@
 # sortedvec
 
-A pure rust library that exposes a single macro, [`sortedvec`]. It generates a lookup
-table on `Ord` keys that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
-and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
+A pure rust library that exposes macros that generate data structures
+on `Ord` keys that enables quicker lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
+and is simpler and more memory efficient than hashmaps. It is ideal for small
 lookup tables where insertions and deletions are infrequent.
 
 **Note**: `sortedvec` is still highly experimental and likely to change significantly.
