@@ -1,5 +1,5 @@
-//! This crate exposes a single macro, [`sortedvec`]. It generates a lookup
-//! table on `Ord` keys that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
+//! This crate exposes macros that generate lookup
+//! tables on `Ord` keys that has quicker lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
 //! and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
 //! lookup tables where insertions and deletions are infrequent.
 
@@ -47,7 +47,7 @@ pub mod example;
 /// - a key type. Since we will sort on these internally, this type must implement `Ord`,
 /// - a key extraction function of type `FnMut(&T) -> K`.
 ///
-/// Matches the following input:
+/// It matches the following input:
 /// ```text
 /// $(#[$attr:meta])*
 /// $v:vis struct $name:ident {
@@ -250,6 +250,29 @@ macro_rules! sortedvec {
     }
 }
 
+/// A macro that defines a sorted vector data collection on [slice] keys. It differs from the standard
+/// `sortedvec` macro in that the generated data structure is sorted on slices. This enables binary
+/// searches to be a bit smarter by skipping the comparison of the start of the slice that was shared
+/// with probes smaller and larger than the current probe.
+///
+/// The generated struct is specific to the given keys and value types. To create the struct,
+/// four bits are required:
+/// - a struct name,
+/// - a value type,
+/// - a slice key type of the form `&[K]`. Since we will sort on these internally, `K` must implement `Ord`,
+/// - a key extraction function of type `FnMut(&T) -> &[K]`.
+///
+/// It matches the following input:
+/// ```text
+/// $(#[$attr:meta])*
+/// $v:vis struct $name:ident {
+///     fn $keyfn:ident ($i:ident : & $val:ty) -> & [ $key:ty ] {
+///         $keyexpr:expr
+///     } $(,)?
+/// }
+/// ```
+///
+/// [slice]: https://doc.rust-lang.org/std/primitive.slice.html
 #[macro_export]
 macro_rules! sortedvec_slicekey {
 (
@@ -260,9 +283,6 @@ macro_rules! sortedvec_slicekey {
         } $(,)?
     }
 ) => {
-        #[allow(unused_imports)]
-        use $crate::SliceOrd as _;
-
         fn $keyfn ($i : &$val) -> & [ $key ] { $keyexpr }
 
         $(#[$attr])*
@@ -273,7 +293,6 @@ macro_rules! sortedvec_slicekey {
         impl $name {
             /// Internal method for lookups by key, returning the index where it is found
             /// or where it should be inserted if it is not found.
-            #[inline(always)]
             fn try_find<E: AsRef<[$key]>>(&self, init_key: E) -> Result<usize, usize> {
                 let mut size = self.inner.len();
                 let mut upper_shared_prefix = 0;
@@ -293,7 +312,7 @@ macro_rules! sortedvec_slicekey {
                     let elt = unsafe { self.inner.get_unchecked(mid) };
                     let key = $keyfn(elt);
                     let (prefix_len, cmp) = unsafe { 
-                        key.get_unchecked(prefix_skip..).compare(key_as_slice.get_unchecked(prefix_skip..))
+                        Self::compare(key.get_unchecked(prefix_skip..), key_as_slice.get_unchecked(prefix_skip..))
                     };
                     base = match cmp {
                         std::cmp::Ordering::Greater => {
@@ -312,13 +331,32 @@ macro_rules! sortedvec_slicekey {
                 // base is always in [0, size) because base <= mid.
                 let elt = unsafe { self.inner.get_unchecked(base) };
                 let key = unsafe { &$keyfn(&elt).get_unchecked(prefix_skip..) };
-                let (_prefix, cmp) = unsafe { key.compare(key_as_slice.get_unchecked(prefix_skip..)) };
+                let (_prefix, cmp) = unsafe { Self::compare(key, key_as_slice.get_unchecked(prefix_skip..)) };
                 if cmp == std::cmp::Ordering::Equal { Ok(base) } else { Err(base) }
+            }
+
+            #[inline]
+            fn compare(slice: &[$key], other: &[$key]) -> (usize, std::cmp::Ordering) {
+                let l = std::cmp::min(slice.len(), other.len());
+                let mut prefix_len = 0;
+
+                // Slice to the loop iteration range to enable bound check
+                // elimination in the compiler
+                let lhs = &slice[..l];
+                let rhs = &other[..l];
+
+                for i in 0..l {
+                    match lhs[i].cmp(&rhs[i]) {
+                        std::cmp::Ordering::Equal => { prefix_len += 1 }
+                        non_eq => return (prefix_len, non_eq),
+                    }
+                }
+
+                (prefix_len, slice.len().cmp(&other.len()))
             }
 
             /// Finds and returns reference to element with given key, if it exists.
             /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
-            #[inline(always)]
             pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
                 self.try_find(init_key).ok().map(|ix| unsafe { self.inner.get_unchecked(ix) })
             }
@@ -451,36 +489,6 @@ macro_rules! sortedvec_slicekey {
     }
 }
 
-// intermediate trait for specialization of slice's Ord.
-// comparisons additionally return the length of the longest common prefix
-pub trait SliceOrd<B> {
-    fn compare(&self, other: &[B]) -> (usize, std::cmp::Ordering);
-}
-
-impl<A> SliceOrd<A> for [A]
-    where A: Ord
-{
-    #[inline]
-    fn compare(&self, other: &[A]) -> (usize, std::cmp::Ordering) {
-        let l = std::cmp::min(self.len(), other.len());
-        let mut prefix_len = 0;
-
-        // Slice to the loop iteration range to enable bound check
-        // elimination in the compiler
-        let lhs = &self[..l];
-        let rhs = &other[..l];
-
-        for i in 0..l {
-            match lhs[i].cmp(&rhs[i]) {
-                std::cmp::Ordering::Equal => { prefix_len += 1 }
-                non_eq => return (prefix_len, non_eq),
-            }
-        }
-
-        (prefix_len, self.len().cmp(&other.len()))
-    }
-}
-
 #[cfg(test)]
 #[allow(unused_variables)]
 mod tests {
@@ -553,11 +561,6 @@ mod slices_tests {
     fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
         let shared_len = std::cmp::min(a.len(), b.len());
         a[..shared_len].iter().zip(b[..shared_len].iter()).take_while(|(a, b)| a == b).count()
-    }
-
-    #[quickcheck]
-    fn compare_slices_works(a: Vec<u8>, b: Vec<u8>) -> bool {
-        a.compare(&b).1 == a.cmp(&b)
     }
 
     #[quickcheck]
