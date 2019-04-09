@@ -26,9 +26,6 @@
 //! assert!(sorted_contains_six.is_none());
 //! ```
 
-#![feature(specialization)]
-#![allow(dead_code)]
-
 #[cfg(test)]
 extern crate quickcheck;
 #[cfg(test)]
@@ -99,6 +96,7 @@ macro_rules! sortedvec {
             inner: Vec<$val>,
         }
 
+        #[allow(dead_code)]
         impl $name {
             fn derive_key($i : &$val) -> $key { $keyexpr }
 
@@ -301,6 +299,7 @@ macro_rules! sortedvec_slicekey {
             inner: Vec<$val>,
         }
 
+        #[allow(dead_code)]
         impl $name {
             fn derive_key($i : &$val) -> & [ $key ] { $keyexpr }
         
@@ -567,12 +566,6 @@ mod slices_tests {
         pub struct SortedVecOfListLikes {
             fn derive_key(t: &String) -> &[u8] { t.as_bytes() }
         }
-    }
-
-    // naive implementation of u8 slice compare for reference
-    fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-        let shared_len = std::cmp::min(a.len(), b.len());
-        a[..shared_len].iter().zip(b[..shared_len].iter()).take_while(|(a, b)| a == b).count()
     }
 
     #[quickcheck]

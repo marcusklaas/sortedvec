@@ -55,7 +55,7 @@ The table below displays how lookups scale on the standard library's `HashMap`,
 ## Change log
 
  - **5.0**:
-   * Introduction of the `sortedvec_slicekey!` macro
+   * Introduction of the `sortedvec_slicekey!` macro.
    * Resolved key derivation function naming collisions by associating them to the data structure.
      This fixes the key derivation names to `derive_key`. This is a *breaking change*.
  - **4.1**: First public release.
