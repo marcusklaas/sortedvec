@@ -43,7 +43,7 @@ macro_rules! gen_bench {
 mod string_bench {
     sortedvec::sortedvec! {
         struct SortedVec {
-            fn key_deriv(x: &String) -> &str { &x[..] }
+            fn derive_key(x: &String) -> &str { &x[..] }
         }
     }
 
@@ -71,7 +71,7 @@ mod string_bench {
 mod int_bench {
     sortedvec::sortedvec! {
         struct SortedVec {
-            fn key_deriv(x: &u32) -> u32 { *x }
+            fn derive_key(x: &u32) -> u32 { *x }
         }
     }
 

@@ -1,8 +1,8 @@
 # sortedvec
 
-A pure rust library that exposes a single macro, [`sortedvec`]. It generates a lookup
-table on `Ord` keys that has quicker lookups than regular `Vec`s, `O(log(n))` vs `O(n)`,
-and is simpler and more memory efficient than hashmaps. It is ideal for (very) small
+A pure rust library that exposes macros that generate data structures
+on `Ord` keys that enables quicker lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
+and is simpler and more memory efficient than hashmaps. It is ideal for small
 lookup tables where insertions and deletions are infrequent.
 
 **Note**: `sortedvec` is still highly experimental and likely to change significantly.
@@ -51,3 +51,12 @@ The table below displays how lookups scale on the standard library's `HashMap`,
 | string | 100 | 27 | 42 | 232 |
 | string | 500 | 26 | 53 | 1,207 |
 | string |1000 | 26 | 59 | 2,324 |
+
+## Change log
+
+ - **5.0**:
+   * Introduction of the `sortedvec_slicekey!` macro.
+   * Resolved key derivation function naming collisions by associating them to the data structure.
+     This fixes the key derivation names to `derive_key`. This is a *breaking change*.
+ - **4.1**: First public release.
+
