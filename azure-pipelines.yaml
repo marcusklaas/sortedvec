@@ -10,5 +10,3 @@ steps:
     displayName: Cargo build
   - script: cargo test --all
     displayName: Cargo test
-  - script: cargo bench -- dontmatchanything
-    displayName: Compile benchmarks without running them

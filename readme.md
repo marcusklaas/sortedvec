@@ -1,5 +1,11 @@
 # sortedvec
 
+[![Build Status](https://dev.azure.com/marcusklaas/sortedvec/_apis/build/status/marcusklaas.sortedvec?branchName=master)](https://dev.azure.com/marcusklaas/sortedvec/_build/latest?definitionId=2&branchName=master)
+[![Docs](https://docs.rs/sortedvec/badge.svg)](https://docs.rs/sortedvec)
+[![Crates.io](https://img.shields.io/crates/v/sortedvec.svg?maxAge=2592000)](https://crates.io/crates/sortedvec)
+
+[Documentation](https://docs.rs/sortedvec/)
+
 A pure rust library that exposes macros that generate data structures
 on `Ord` keys that enables quicker lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
 and is simpler and more memory efficient than hashmaps. It is ideal for small
