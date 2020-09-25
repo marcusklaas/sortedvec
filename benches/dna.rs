@@ -1,9 +1,9 @@
 #![feature(test)]
 
-extern crate sortedvec;
 extern crate test;
 
 use rand::prelude::*;
+use rand::rngs::SmallRng;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
@@ -65,23 +65,23 @@ impl Distribution<Primer> for CustomDist {
 
         for i in 0..length {
             let next = match (prev, rng.gen::<u8>()) {
-                (Nucleobase::Adenine, 0  ..=128) => Nucleobase::Adenine,
+                (Nucleobase::Adenine, 0..=128) => Nucleobase::Adenine,
                 (Nucleobase::Adenine, 129..=170) => Nucleobase::Cytosine,
                 (Nucleobase::Adenine, 171..=240) => Nucleobase::Guanine,
                 (Nucleobase::Adenine, 141..=255) => Nucleobase::Thymine,
 
-                (Nucleobase::Cytosine, 0  ..=80)  => Nucleobase::Adenine,
-                (Nucleobase::Cytosine, 80 ..=100) => Nucleobase::Cytosine,
+                (Nucleobase::Cytosine, 0..=80) => Nucleobase::Adenine,
+                (Nucleobase::Cytosine, 80..=100) => Nucleobase::Cytosine,
                 (Nucleobase::Cytosine, 101..=200) => Nucleobase::Guanine,
                 (Nucleobase::Cytosine, 201..=255) => Nucleobase::Thymine,
 
-                (Nucleobase::Guanine, 0  ..=60)  => Nucleobase::Adenine,
-                (Nucleobase::Guanine, 61 ..=80)  => Nucleobase::Cytosine,
-                (Nucleobase::Guanine, 81 ..=180) => Nucleobase::Guanine,
+                (Nucleobase::Guanine, 0..=60) => Nucleobase::Adenine,
+                (Nucleobase::Guanine, 61..=80) => Nucleobase::Cytosine,
+                (Nucleobase::Guanine, 81..=180) => Nucleobase::Guanine,
                 (Nucleobase::Guanine, 181..=255) => Nucleobase::Thymine,
 
-                (Nucleobase::Thymine, 0  ..=30)  => Nucleobase::Adenine,
-                (Nucleobase::Thymine, 31 ..=120) => Nucleobase::Cytosine,
+                (Nucleobase::Thymine, 0..=30) => Nucleobase::Adenine,
+                (Nucleobase::Thymine, 31..=120) => Nucleobase::Cytosine,
                 (Nucleobase::Thymine, 121..=254) => Nucleobase::Guanine,
                 (Nucleobase::Thymine, 255..=255) => Nucleobase::Thymine,
             };
@@ -89,10 +89,7 @@ impl Distribution<Primer> for CustomDist {
             prev = next;
         }
 
-        Primer {
-            length,
-            sequence,
-        }
+        Primer { length, sequence }
     }
 }
 

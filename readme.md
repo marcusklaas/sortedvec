@@ -11,7 +11,7 @@ on `Ord` keys that enables quicker lookups than regular `Vec`s (`O(log(n))` vs `
 and is simpler and more memory efficient than hashmaps. It is ideal for small
 lookup tables where insertions and deletions are infrequent.
 
-**Note**: `sortedvec` is still highly experimental and likely to change significantly.
+**Note**: `sortedvec` is still experimental and its interface may change.
 
 ## Example
 
@@ -60,9 +60,10 @@ The table below displays how lookups scale on the standard library's `HashMap`,
 
 ## Change log
 
- - **5.0**:
+ - **0.5.0**:
    * Introduction of the `sortedvec_slicekey!` macro.
+   * Introduction of the `position` method.
    * Resolved key derivation function naming collisions by associating them to the data structure.
      This fixes the key derivation names to `derive_key`. This is a *breaking change*.
- - **4.1**: First public release.
+ - **0.4.1**: First public release.
 

@@ -100,28 +100,34 @@ macro_rules! sortedvec {
         impl $name {
             fn derive_key($i : &$val) -> $key { $keyexpr }
 
+            /// Tries to find an element in the collection with the given key, and return
+            /// its index when found. When it is not present, the index where it should be
+            /// inserted is returned. This method has logarithmic worst case time complexity.
+            pub fn position(&self, key: &$key) -> Result<usize, usize> {
+                self.inner
+                    .binary_search_by(|probe| Self::derive_key(probe).cmp(key))
+            }
+
             /// Tries to find an element in the collection with the given key. It has
             /// logarithmic worst case time complexity.
             pub fn find(&self, key: &$key) -> Option<&$val> {
-                self.inner
-                    .binary_search_by(|probe| Self::derive_key(probe).cmp(key))
+                // The unsafe block is OK because `position` is guaranteed to
+                // return a valid index.
+                self.position(key)
                     .ok()
-                    .and_then(|idx| self.inner.get(idx))
+                    .map(|idx| unsafe { self.inner.get_unchecked(idx) })
             }
 
             /// Checks whether there is a value with that key in the collection. This is
             /// done in `O(log(n))` time.
             pub fn contains(&self, key: &$key) -> bool {
-                self.inner
-                    .binary_search_by(|probe| Self::derive_key(probe).cmp(key))
-                    .is_ok()
+                self.position(key).is_ok()
             }
 
             /// Removes and returns a single value from the collection with the given key,
             /// if it exists. This operation has linear worst-case time complexity.
             pub fn remove(&mut self, key: &$key) -> Option<$val> {
-                self.inner
-                    .binary_search_by(|probe| Self::derive_key(probe).cmp(key))
+                self.position(key)
                     .ok()
                     .map(|idx| self.inner.remove(idx))
             }
@@ -130,10 +136,7 @@ macro_rules! sortedvec {
             /// order invariant. This is an `O(n)` operation.
             pub fn insert(&mut self, val: $val) {
                 let ref key = Self::derive_key(&val);
-                let search = self
-                    .inner
-                    .binary_search_by(|probe| Self::derive_key(probe).cmp(key));
-                let idx = match search {
+                let idx = match self.position(key) {
                     Ok(i) | Err(i) => i,
                 };
                 self.inner.insert(idx, val);
@@ -302,10 +305,11 @@ macro_rules! sortedvec_slicekey {
         #[allow(dead_code)]
         impl $name {
             fn derive_key($i : &$val) -> & [ $key ] { $keyexpr }
-        
-            /// Internal method for lookups by key, returning the index where it is found
-            /// or where it should be inserted if it is not found.
-            fn try_find<E: AsRef<[$key]>>(&self, init_key: E) -> Result<usize, usize> {
+
+            /// Tries to find an element in the collection with the given key, and return
+            /// its index when found. When it is not present, the index where it should be
+            /// inserted is returned. This method has logarithmic worst case time complexity.
+            pub fn position<E: AsRef<[$key]>>(&self, init_key: E) -> Result<usize, usize> {
                 let mut size = self.inner.len();
                 let mut upper_shared_prefix = 0;
                 let mut lower_shared_prefix = 0;
@@ -323,16 +327,16 @@ macro_rules! sortedvec_slicekey {
                     // mid < size: mid = size / 2 + size / 4 + size / 8 ...
                     let elt = unsafe { self.inner.get_unchecked(mid) };
                     let key = Self::derive_key(elt);
-                    let (prefix_len, cmp) = unsafe { 
+                    let (prefix_len, cmp) = unsafe {
                         Self::compare(key.get_unchecked(prefix_skip..), key_as_slice.get_unchecked(prefix_skip..))
                     };
                     base = match cmp {
                         std::cmp::Ordering::Greater => {
-                            upper_shared_prefix = prefix_skip + prefix_len; 
+                            upper_shared_prefix = prefix_skip + prefix_len;
                             base
                         }
                         std::cmp::Ordering::Less => {
-                            lower_shared_prefix = prefix_skip + prefix_len; 
+                            lower_shared_prefix = prefix_skip + prefix_len;
                             mid
                         }
                         std::cmp::Ordering::Equal => return Ok(mid),
@@ -370,19 +374,21 @@ macro_rules! sortedvec_slicekey {
             /// Finds and returns reference to element with given key, if it exists.
             /// Implementation largely taken from `::std::vec::Vec::binary_search_by`.
             pub fn find<E: AsRef<[$key]>>(&self, init_key: E) -> Option<&$val> {
-                self.try_find(init_key).ok().map(|ix| unsafe { self.inner.get_unchecked(ix) })
+                // The unsafe block is OK because `position` is guaranteed to
+                // return a valid index.
+                self.position(init_key).ok().map(|ix| unsafe { self.inner.get_unchecked(ix) })
             }
 
             /// Checks whether there is a value with that key in the collection. This is
             /// done in `O(log(n))` time.
             pub fn contains<E: AsRef<[$key]>>(&self, key: E) -> bool {
-                self.try_find(key).is_ok()
+                self.position(key).is_ok()
             }
 
             /// Removes and returns a single value from the collection with the given key,
             /// if it exists. This operation has linear worst-case time complexity.
             pub fn remove<E: AsRef<[$key]>>(&mut self, key: E) -> Option<$val> {
-                self.try_find(key)
+                self.position(key)
                     .ok()
                     .map(|idx| self.inner.remove(idx))
             }
@@ -391,8 +397,7 @@ macro_rules! sortedvec_slicekey {
             /// order invariant. This is an `O(n)` operation.
             pub fn insert(&mut self, val: $val) {
                 let ref key = Self::derive_key(&val);
-                let search = self.try_find(key);
-                let idx = match search {
+                let idx = match self.position(key) {
                     Ok(i) | Err(i) => i,
                 };
                 self.inner.insert(idx, val);
@@ -581,7 +586,8 @@ mod slices_tests {
     fn strings_in_vec(xs: Vec<String>) -> bool {
         let sorted = SortedVecOfListLikes::from(xs.clone());
 
-        xs.into_iter().all(|s| sorted.find(s.as_bytes()).unwrap() == &s)
+        xs.into_iter()
+            .all(|s| sorted.find(s.as_bytes()).unwrap() == &s)
     }
 
     #[quickcheck]
@@ -595,7 +601,8 @@ mod slices_tests {
     fn bad_case() {
         let case = &[
             "\u{80}", "\u{80}", "\u{80}", "\u{80}", "", "\u{80}", "", "", "¤", "", "", "\u{80}",
-            "", "\u{80}", "", "\u{80}", "", "¤\u{0}", "¥", "", "", "¥", "", "\u{80}", "", "", "¥", "\u{80}", ""
+            "", "\u{80}", "", "\u{80}", "", "¤\u{0}", "¥", "", "", "¥", "", "\u{80}", "", "", "¥",
+            "\u{80}", "",
         ];
         let sorted: SortedVecOfListLikes = case.into_iter().map(|&x| x.to_owned()).collect();
 
