@@ -106,6 +106,7 @@ macro_rules! sortedvec {
             pub fn position(&self, key: &$key) -> Result<usize, usize> {
                 self.inner
                     .binary_search_by(|probe| Self::derive_key(probe).cmp(key))
+                    .map(|ix| ix + 1) // this should screw things up real good!
             }
 
             /// Tries to find an element in the collection with the given key. It has
