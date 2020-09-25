@@ -16,7 +16,7 @@ lookup tables where insertions and deletions are infrequent.
 ## Motivation
 
 The raison d'être for this crate is to overcome the limitations that come with the
-straightforward implementation of sorted vectors using generic structs. For exmaple, a
+straightforward implementation of sorted vectors using generic structs. For example, a
 simple struct like below *can* work in theory:
 ```rust
 struct SortedVec<T, K, Comp>
