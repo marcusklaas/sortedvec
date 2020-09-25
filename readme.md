@@ -6,12 +6,49 @@
 
 [Documentation](https://docs.rs/sortedvec/)
 
-A pure rust library that exposes macros that generate data structures
+A pure rust library without dependencies that exposes macros that generate data structures
 on `Ord` keys that enables quicker lookups than regular `Vec`s (`O(log(n))` vs `O(n)`)
 and is simpler and more memory efficient than hashmaps. It is ideal for small
 lookup tables where insertions and deletions are infrequent.
 
 **Note**: `sortedvec` is still experimental and its interface may change.
+
+## Motivation
+
+The raison d'être for this crate is to overcome the limitations that come with the
+straightforward implementation of sorted vectors using generic structs. For exmaple, a
+simple struct like below *can* work in theory:
+```rust
+struct SortedVec<T, K, Comp>
+where
+    K: Ord,
+    Comp: Fn(&T) -> K,
+{
+    inner: Vec<T>,
+    comperator: Comp,
+}
+```
+but since Rust function types cannot be written down, all the functions that
+take such a struct as argument and structs that have it as a compoment must themselves
+become parametric over `Comp`. This won't fly:
+```rust
+struct Foo {
+    // What would we write here?   ↓
+    sortedvec: SortedVec<u32, u32, _>,
+    ..
+}
+```
+Indeed, `Foo` itself must `Comp` as a type parameter:
+```rust
+struct Foo<Comp> {
+    sortedvec: SortedVec<u32, u32, Comp>,
+    ..
+}
+```
+which means that now the type of `Foo<Comp>` cannot be made explicit and so on. It's
+all fairly messy and painful. Using the `sortedvec!` macro to generate structs lets
+us write the full types of sorted vectors without infecting everything that touches it
+with type parameters.
 
 ## Example
 
@@ -38,8 +75,8 @@ assert!(sorted_contains_six.is_none());
 
 ## Benchmarks
 
-The table below displays how lookups scale on the standard library's `HashMap`,
-`SortedVec` and `Vec` for string and integer keys.
+The table below displays how lookups scale (in nanoseconds) using `SortedVec`
+compared to the standard library's `HashMap` and `Vec` for string and integer keys.
 
 | key type | size | `HashMap` | `SortedVec` | `Vec` |
 |---|---:|---:|---:|---:|
